@@ -1,0 +1,23 @@
+# Core dependencies
+numpy
+pyyaml
+
+# Database dependencies
+psycopg2-binary
+supabase
+pgvector
+
+# Embedding providers
+openai
+requests  # For Ollama API
+
+# Document processing
+PyMuPDF  # For PDF processing
+
+# Cloud storage
+azure-storage-blob
+google-api-python-client
+google-auth
+
+# Optional dependencies
+python-dotenv  # For environment variable management 
