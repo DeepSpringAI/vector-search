@@ -1,0 +1,457 @@
+<div align="center">
+  <img src="inc/logo.png" alt="Vector Search Logo" width="200"/>
+</div>
+
+# Vector Search
+
+A flexible and modular vector search system for document processing, embedding generation, and similarity search.
+
+## Features
+
+- Multiple source providers (Folder, File, Google Drive, Azure Blob)
+- Flexible text chunking strategies (Word-based, Character-based, Custom)
+- Various embedding providers (Ollama, OpenAI, Azure OpenAI, Custom)
+- Database options (PostgreSQL with pgvector, Supabase)
+- Optional text augmentation for better search results
+
+## Installation
+
+### Development Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/vector-search.git
+cd vector-search
+```
+
+2. Create and activate a virtual environment using `uv`:
+```bash
+uv venv
+source .venv/bin/activate  # On Unix/macOS
+# or
+.venv\Scripts\activate  # On Windows
+```
+
+3. Install dependencies:
+```bash
+uv pip install -r requirements.txt
+```
+
+### Using in Your Projects
+
+To use vector-search in your own projects:
+
+1. Create and activate a virtual environment for your project:
+```bash
+mkdir your-project
+cd your-project
+uv venv
+source .venv/bin/activate  # On Unix/macOS
+# or
+.venv\Scripts\activate  # On Windows
+```
+
+2. Install vector-search directly from the project path:
+```bash
+uv pip install '/path/to/vector-search'
+```
+
+Now you can import and use vector-search in your code:
+```python
+from vector_search import VectorSearch
+```
+
+### Environment Setup
+
+Create a `.env` file in your project root:
+```env
+# Database Configuration
+POSTGRES_DB=your_db_name
+POSTGRES_USER=your_user
+POSTGRES_PASSWORD=your_password
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+VECTOR_DIM=1536
+
+# Chunking Configuration
+CHUNK_SIZE=1000
+CHUNK_OVERLAP=200
+
+# OpenAI Configuration (if using OpenAI embeddings)
+OPENAI_API_KEY=your_api_key
+
+# Azure OpenAI Configuration (if using Azure OpenAI)
+AZURE_OPENAI_API_KEY=your_azure_key
+AZURE_OPENAI_API_VERSION=2024-02-01
+AZURE_OPENAI_ENDPOINT=your_azure_endpoint
+AZURE_OPENAI_DEPLOYMENT=your_deployment_name
+
+# Ollama Configuration (if using Ollama)
+OLLAMA_BASE_URL=http://localhost:11434
+
+# Google Drive Configuration (if using Google Drive source)
+GOOGLE_APPLICATION_CREDENTIALS=path/to/credentials.json
+
+# Azure Blob Configuration (if using Azure Blob source)
+AZURE_STORAGE_CONNECTION_STRING=your_connection_string
+AZURE_STORAGE_CONTAINER=your_container_name
+
+# Supabase Configuration (if using Supabase)
+SUPABASE_URL=your_project_url
+SUPABASE_KEY=your_api_key
+SUPABASE_TABLE=chunks
+```
+
+## Basic Usage
+
+```python
+from vector_search import VectorSearch
+
+# Initialize with default components
+vector_search = VectorSearch(
+    source_type="folder",      # Use folder source
+    chunker_type="word",       # Use word-based chunking
+    embedding_type="ollama",   # Use Ollama for embeddings
+    database_type="postgres",  # Use PostgreSQL database
+    augment=False             # No text augmentation
+)
+
+# Process documents from a folder
+vector_search.process_source("path/to/documents")
+
+# Search for similar content
+results = vector_search.search(
+    query="What is machine learning?",
+    limit=5,
+    min_similarity=0.7
+)
+
+# Print results
+for result in results:
+    print(f"Text: {result['text']}")
+    print(f"Similarity: {result['similarity']}")
+    print(f"Source: {result['metadata']['source']}")
+    print(f"Date: {result['date']}")
+    print("---")
+```
+
+## Creating Custom Components
+
+### 1. Custom Source Provider
+
+Create a custom source by inheriting from `BaseSource`:
+
+```python
+from vector_search.sources import BaseSource
+from typing import Dict, Iterator
+
+class CustomSource(BaseSource):
+    def __init__(self, supported_formats=None):
+        super().__init__(supported_formats)
+        # Add custom initialization
+
+    def load_documents(self, source_path: str) -> Iterator[Dict]:
+        # Implement document loading logic
+        documents = []  # Your logic here
+        
+        for doc in documents:
+            yield {
+                "text": doc.content,
+                "metadata": {
+                    "source": doc.name,
+                    "format": doc.format,
+                    "custom_field": doc.custom_field
+                }
+            }
+```
+
+### 2. Custom Chunking Strategy
+
+Create a custom chunker by inheriting from `BaseChunker`:
+
+```python
+from vector_search.chunker import BaseChunker
+from typing import Dict, List
+
+class CustomChunker(BaseChunker):
+    def __init__(self, chunk_size=1000, chunk_overlap=200):
+        super().__init__(chunk_size, chunk_overlap)
+        # Add custom initialization
+
+    def chunk_text(self, text: str, metadata: Dict = None) -> List[Dict]:
+        # Implement chunking logic
+        chunks = []  # Your logic here
+        
+        return [
+            {
+                "text": chunk,
+                "metadata": metadata or {},
+                "chunk_index": i
+            }
+            for i, chunk in enumerate(chunks)
+        ]
+```
+
+### 3. Custom Embedding Provider
+
+Create a custom embedding provider by inheriting from `BaseEmbedding`:
+
+```python
+from vector_search.embeddings import BaseEmbedding
+import numpy as np
+from typing import List, Union
+
+class CustomEmbedding(BaseEmbedding):
+    def __init__(self):
+        # Add custom initialization
+        pass
+
+    def embed(self, texts: Union[str, List[str]]) -> np.ndarray:
+        if isinstance(texts, str):
+            texts = [texts]
+            
+        # Implement embedding generation logic
+        embeddings = []  # Your logic here
+        
+        return np.array(embeddings)
+```
+
+### 4. Custom Database Provider
+
+Create a custom database provider by inheriting from `BaseDatabase`:
+
+```python
+from vector_search.database import BaseDatabase
+import numpy as np
+from typing import Dict, List
+
+class CustomDatabase(BaseDatabase):
+    def __init__(self):
+        # Add custom initialization
+        pass
+
+    def initialize(self) -> None:
+        # Initialize database schema
+        pass
+
+    def store_embeddings(self, chunks: List[Dict], embeddings: np.ndarray) -> None:
+        # Store chunks and embeddings
+        pass
+
+    def search(self, query_embedding: np.ndarray, limit: int = 5) -> List[Dict]:
+        # Implement similarity search
+        results = []  # Your logic here
+        
+        return results
+```
+
+### 5. Custom Augmenter
+
+Create a custom augmenter by inheriting from `BaseAugmenter`:
+
+```python
+from vector_search.augmentation import BaseAugmenter
+from typing import Dict, List
+
+class CustomAugmenter(BaseAugmenter):
+    def __init__(self):
+        # Add custom initialization
+        pass
+
+    def augment(self, chunks: List[Dict]) -> List[Dict]:
+        augmented_chunks = []
+        
+        for chunk in chunks:
+            # Keep original chunk
+            augmented_chunks.append(chunk)
+            
+            # Add augmented version
+            augmented_text = self.generate_variation(chunk["text"])
+            augmented_chunk = chunk.copy()
+            augmented_chunk["text"] = augmented_text
+            augmented_chunk["metadata"] = {
+                **chunk["metadata"],
+                "augmented": True,
+                "original_chunk_index": chunk["chunk_index"]
+            }
+            augmented_chunks.append(augmented_chunk)
+            
+        return augmented_chunks
+
+    def generate_variation(self, text: str) -> str:
+        # Implement text variation generation
+        return modified_text
+```
+
+## Using Custom Components
+
+```python
+# Initialize VectorSearch with custom components
+vector_search = VectorSearch(
+    source_type="folder",
+    chunker_type="word",
+    embedding_type="ollama",
+    database_type="postgres"
+)
+
+# Add custom chunker
+def sentence_chunker(text: str) -> list:
+    import re
+    sentences = re.split(r'[.!?]+', text)
+    return [s.strip() for s in sentences if s.strip()]
+
+vector_search.add_custom_chunker(sentence_chunker)
+
+# Add custom embedding function
+def custom_embed(texts):
+    # Your embedding logic here
+    return embeddings
+
+vector_search.add_custom_embedding(custom_embed)
+```
+
+## Database Schema
+
+Both PostgreSQL and Supabase use the same table schema:
+
+```sql
+CREATE TABLE chunks (
+    id SERIAL PRIMARY KEY,
+    embedding vector(1536),
+    text TEXT NOT NULL,
+    metadata JSONB,
+    date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX ON chunks USING ivfflat (embedding vector_cosine_ops)
+WITH (lists = 100);
+```
+
+## Test Files and Examples
+
+The `tests/` directory contains several test files that demonstrate how to use different components of the system:
+
+### 1. Basic Workflow Test (`test_workflow.py`)
+```python
+# Complete example of processing files and storing in database
+from vector_search.chunker import WordChunker
+from vector_search.embeddings import OllamaEmbedding
+from vector_search.database import PostgresDatabase
+
+# Creates sample text files and processes them
+test_folder = "test_samples"
+file_paths = setup_sample_texts(test_folder)
+process_files(file_paths)
+```
+
+### 2. Database Tests (`test_database.py`)
+```python
+# Test PostgreSQL and Supabase implementations
+from vector_search.database import PostgresDatabase, SupabaseDatabase
+
+# PostgreSQL example
+db = PostgresDatabase(
+    dbname=os.getenv("POSTGRES_DB"),
+    user=os.getenv("POSTGRES_USER"),
+    password=os.getenv("POSTGRES_PASSWORD"),
+    host=os.getenv("POSTGRES_HOST"),
+    port=int(os.getenv("POSTGRES_PORT", "5432")),
+    vector_dim=1536
+)
+
+# Store and search example data
+db.initialize()
+db.store_embeddings(chunks, embeddings)
+results = db.search(query_embedding, limit=2)
+```
+
+### 3. Embedding Tests (`test_embeddings.py`)
+```python
+# Test different embedding providers
+from vector_search.embeddings import OllamaEmbedding, OpenAIEmbedding
+
+# Ollama example
+embedding = OllamaEmbedding(model="bge-m3:latest")
+result = embedding.embed("This is a test document")
+
+# OpenAI example
+embedding = OpenAIEmbedding()
+result = embedding.embed("This is a test document")
+```
+
+### 4. Source Tests (`test_sources.py`)
+```python
+# Test different source providers
+from vector_search.sources import FolderSource, FileSource, GoogleDriveSource
+
+# Folder source example
+source = FolderSource()
+for doc in source.load_documents("path/to/folder"):
+    print(f"Document: {doc['metadata']['source']}")
+    print(f"Content: {doc['text'][:100]}...")
+```
+
+### 5. Chunker Tests (`test_chunkers.py`)
+```python
+# Test different chunking strategies
+from vector_search.chunker import WordChunker, CharacterChunker
+
+# Word chunker example
+chunker = WordChunker(chunk_size=100, chunk_overlap=20)
+chunks = chunker.chunk_text(text, metadata={"source": "test.txt"})
+```
+
+### 6. Vector Search Tests (`test_vector_search.py`)
+```python
+# Test the main VectorSearch implementation
+from vector_search.vector_search import VectorSearch
+
+# Basic workflow
+vector_search = VectorSearch(
+    source_type="folder",
+    chunker_type="word",
+    embedding_type="ollama",
+    database_type="postgres"
+)
+
+# Process and search
+vector_search.process_source("test_data")
+results = vector_search.search("What is machine learning?", limit=5)
+```
+
+### Running the Tests
+
+1. Make sure you have all dependencies installed and environment variables set
+2. Run individual tests:
+```bash
+python -m pytest tests/test_database.py
+python -m pytest tests/test_embeddings.py
+python -m pytest tests/test_sources.py
+python -m pytest tests/test_chunkers.py
+python -m pytest tests/test_vector_search.py
+python -m pytest tests/test_workflow.py
+```
+
+3. Run all tests:
+```bash
+python -m pytest tests/
+```
+
+The test files serve as both documentation and examples of how to use each component of the system. They demonstrate:
+- Basic usage patterns
+- Component initialization
+- Error handling
+- Integration between components
+- Complete workflows
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
