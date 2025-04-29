@@ -1,6 +1,7 @@
 """Test the main VectorSearch implementation."""
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 from vector_search.vector_search import VectorSearch
 
@@ -42,6 +43,8 @@ def setup_test_data():
 
 def test_basic_workflow():
     """Test basic vector search workflow."""
+    load_dotenv()
+    
     # Create test data
     test_folder = setup_test_data()
     
@@ -84,6 +87,8 @@ def test_basic_workflow():
 
 def test_augmented_search():
     """Test vector search with chunk augmentation."""
+    load_dotenv()
+    
     if not os.getenv("OPENAI_API_KEY"):
         print("\nSkipping augmented search test - OpenAI API key not set")
         return
@@ -131,6 +136,8 @@ def test_augmented_search():
 
 def test_custom_components():
     """Test vector search with custom components."""
+    load_dotenv()
+    
     # Create test data
     test_folder = setup_test_data()
     

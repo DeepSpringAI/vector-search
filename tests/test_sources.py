@@ -1,8 +1,8 @@
 """Test input source providers."""
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
-from vector_search.config import Config
 from vector_search.sources import (
     FolderSource, FileSource, GoogleDriveSource, AzureBlobSource
 )
@@ -10,8 +10,7 @@ from vector_search.sources import (
 
 def test_folder_source():
     """Test folder source provider."""
-    config = Config("config.yaml")
-    source = FolderSource(config)
+    source = FolderSource()
     
     # Create test folder with sample files
     test_folder = Path("test_data")
@@ -42,8 +41,7 @@ def test_folder_source():
 
 def test_file_source():
     """Test single file source provider."""
-    config = Config("config.yaml")
-    source = FileSource(config)
+    source = FileSource()
     
     # Create test file
     test_file = Path("test.txt")
@@ -68,12 +66,13 @@ def test_file_source():
 
 def test_google_drive_source():
     """Test Google Drive source provider."""
-    if not os.getenv("GOOGLE_DRIVE_CREDENTIALS_PATH"):
+    load_dotenv()
+    
+    if not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
         print("\nSkipping Google Drive test - credentials not set")
         return
         
-    config = Config("config.yaml")
-    source = GoogleDriveSource(config)
+    source = GoogleDriveSource()
     
     # Replace with a real folder ID from your Google Drive
     folder_id = "your_folder_id"
@@ -91,12 +90,13 @@ def test_google_drive_source():
 
 def test_azure_blob_source():
     """Test Azure Blob Storage source provider."""
+    load_dotenv()
+    
     if not os.getenv("AZURE_STORAGE_CONNECTION_STRING"):
         print("\nSkipping Azure Blob test - connection string not set")
         return
         
-    config = Config("config.yaml")
-    source = AzureBlobSource(config)
+    source = AzureBlobSource()
     
     # Replace with your blob prefix
     blob_prefix = "test/"
@@ -120,8 +120,8 @@ if __name__ == "__main__":
     print("\nTesting File Source:")
     test_file_source()
     
-    # print("\nTesting Google Drive Source:")
-    # test_google_drive_source()
+    print("\nTesting Google Drive Source:")
+    test_google_drive_source()
     
-    # print("\nTesting Azure Blob Source:")
-    # test_azure_blob_source() 
+    print("\nTesting Azure Blob Source:")
+    test_azure_blob_source() 

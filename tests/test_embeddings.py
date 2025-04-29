@@ -3,15 +3,16 @@ import os
 from pathlib import Path
 
 import numpy as np
+from dotenv import load_dotenv
 
-from vector_search.config import Config
 from vector_search.embeddings import OllamaEmbedding, OpenAIEmbedding
 
 
 def test_ollama_embedding():
     """Test Ollama embedding provider."""
-    config = Config("config.yaml")
-    embedding = OllamaEmbedding(config, model="bge-m3:latest")
+    load_dotenv()
+    
+    embedding = OllamaEmbedding(model="bge-m3:latest")
     
     # Test single text
     text = "This is a test document for embedding generation."
@@ -30,12 +31,13 @@ def test_ollama_embedding():
 
 def test_openai_embedding():
     """Test OpenAI embedding provider."""
+    load_dotenv()
+    
     if not os.getenv("OPENAI_API_KEY"):
         print("Skipping OpenAI test - API key not set")
         return
         
-    config = Config("config.yaml")
-    embedding = OpenAIEmbedding(config)
+    embedding = OpenAIEmbedding()
     
     # Test single text
     text = "This is a test document for OpenAI embedding."
@@ -62,8 +64,7 @@ def test_custom_embedding():
     
     from vector_search.embeddings import CustomEmbedding
     
-    config = Config("config.yaml")
-    embedding = CustomEmbedding(config, mock_embed)
+    embedding = CustomEmbedding(mock_embed)
     
     # Test single text
     text = "This is a test for custom embedding."
@@ -84,8 +85,8 @@ if __name__ == "__main__":
     print("\nTesting Ollama embeddings:")
     test_ollama_embedding()
     
-    # print("\nTesting OpenAI embeddings:")
-    # test_openai_embedding()
+    print("\nTesting OpenAI embeddings:")
+    test_openai_embedding()
     
-    # print("\nTesting custom embeddings:")
-    # test_custom_embedding() 
+    print("\nTesting custom embeddings:")
+    test_custom_embedding() 

@@ -1,26 +1,16 @@
 """Database providers for vector search."""
 import os
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import numpy as np
 import psycopg2
 from psycopg2.extras import execute_values
 from supabase import Client, create_client
 
-from .config import Config
-
 
 class BaseDatabase(ABC):
     """Base class for database providers."""
-
-    def __init__(self, config: Config):
-        """Initialize database provider.
-
-        Args:
-            config: Configuration instance
-        """
-        self.config = config
 
     @abstractmethod
     def initialize(self) -> None:
@@ -54,20 +44,32 @@ class BaseDatabase(ABC):
 class PostgresDatabase(BaseDatabase):
     """PostgreSQL database provider with pgvector extension."""
 
-    def __init__(self, config: Config):
+    def __init__(
+        self,
+        dbname: str = None,
+        user: str = None,
+        password: str = None,
+        host: str = "localhost",
+        port: int = 5432,
+        vector_dim: int = 1536
+    ):
         """Initialize PostgreSQL database connection.
 
         Args:
-            config: Configuration instance
+            dbname: Database name
+            user: Database user
+            password: Database password
+            host: Database host
+            port: Database port
+            vector_dim: Dimension of vectors to store
         """
-        super().__init__(config)
-        self.vector_dim = config.vector_dim
+        self.vector_dim = vector_dim
         self.conn = psycopg2.connect(
-            dbname=config.db_name,
-            user=config.db_user,
-            password=config.db_password,
-            host=config.db_host or "localhost",
-            port=config.db_port or 5432
+            dbname=dbname,
+            user=user,
+            password=password,
+            host=host,
+            port=port
         )
 
     def initialize(self) -> None:
@@ -157,20 +159,24 @@ class PostgresDatabase(BaseDatabase):
 class SupabaseDatabase(BaseDatabase):
     """Supabase database provider."""
 
-    def __init__(self, config: Config):
+    def __init__(
+        self,
+        url: str = None,
+        key: str = None,
+        table_name: str = "chunks"
+    ):
         """Initialize Supabase client.
 
         Args:
-            config: Configuration instance
+            url: Supabase project URL
+            key: Supabase API key
+            table_name: Name of the table to store chunks
         """
-        super().__init__(config)
-        self.url = os.getenv("SUPABASE_URL")
-        self.key = os.getenv("SUPABASE_KEY")
-        if not self.url or not self.key:
+        if not url or not key:
             raise ValueError("Supabase URL and key must be provided")
             
-        self.client = create_client(self.url, self.key)
-        self.table_name = "chunks"
+        self.client = create_client(url, key)
+        self.table_name = table_name
 
     def initialize(self) -> None:
         """Initialize database schema using Supabase SQL editor.

@@ -10,20 +10,16 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
-from .config import Config
-
 
 class BaseSource(ABC):
     """Base class for input sources."""
 
-    def __init__(self, config: Config, supported_formats: Set[str] = None):
+    def __init__(self, supported_formats: Set[str] = None):
         """Initialize input source.
 
         Args:
-            config: Configuration instance
             supported_formats: Set of supported file formats (e.g., {'txt', 'pdf'})
         """
-        self.config = config
         self.supported_formats = supported_formats or {'txt', 'md', 'markdown', 'json', 'pdf'}
 
     @abstractmethod
@@ -133,15 +129,14 @@ class FileSource(BaseSource):
 class GoogleDriveSource(BaseSource):
     """Handler for loading documents from Google Drive."""
 
-    def __init__(self, config: Config, supported_formats: Set[str] = None):
+    def __init__(self, supported_formats: Set[str] = None):
         """Initialize Google Drive source.
 
         Args:
-            config: Configuration instance
             supported_formats: Set of supported file formats
         """
-        super().__init__(config, supported_formats)
-        credentials_path = self.config.google_credentials
+        super().__init__(supported_formats)
+        credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
         if not credentials_path:
             raise ValueError("Google Drive credentials path not set")
 
@@ -193,16 +188,15 @@ class GoogleDriveSource(BaseSource):
 class AzureBlobSource(BaseSource):
     """Handler for loading documents from Azure Blob Storage."""
 
-    def __init__(self, config: Config, supported_formats: Set[str] = None):
+    def __init__(self, supported_formats: Set[str] = None):
         """Initialize Azure Blob source.
 
         Args:
-            config: Configuration instance
             supported_formats: Set of supported file formats
         """
-        super().__init__(config, supported_formats)
-        connection_string = self.config.azure_connection_string
-        self.container_name = self.config.azure_container
+        super().__init__(supported_formats)
+        connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+        self.container_name = os.getenv("AZURE_STORAGE_CONTAINER")
 
         if not connection_string or not self.container_name:
             raise ValueError("Azure Blob connection string and container name must be set")

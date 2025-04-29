@@ -3,19 +3,27 @@ import os
 from pathlib import Path
 
 import numpy as np
+from dotenv import load_dotenv
 
-from vector_search.config import Config
 from vector_search.database import PostgresDatabase, SupabaseDatabase
 
 
 def test_postgres_database():
     """Test PostgreSQL database provider."""
+    load_dotenv()
+    
     if not os.getenv("POSTGRES_DB"):
         print("\nSkipping PostgreSQL test - database credentials not set")
         return
         
-    config = Config("config.yaml")
-    db = PostgresDatabase(config)
+    db = PostgresDatabase(
+        dbname=os.getenv("POSTGRES_DB"),
+        user=os.getenv("POSTGRES_USER"),
+        password=os.getenv("POSTGRES_PASSWORD"),
+        host=os.getenv("POSTGRES_HOST"),
+        port=int(os.getenv("POSTGRES_PORT", "5432")),
+        vector_dim=int(os.getenv("VECTOR_DIM", "1536"))
+    )
     
     # Initialize database
     print("\nInitializing PostgreSQL database...")
@@ -67,12 +75,17 @@ def test_postgres_database():
 
 def test_supabase_database():
     """Test Supabase database provider."""
+    load_dotenv()
+    
     if not os.getenv("SUPABASE_URL") or not os.getenv("SUPABASE_KEY"):
         print("\nSkipping Supabase test - credentials not set")
         return
         
-    config = Config("config.yaml")
-    db = SupabaseDatabase(config)
+    db = SupabaseDatabase(
+        url=os.getenv("SUPABASE_URL"),
+        key=os.getenv("SUPABASE_KEY"),
+        table_name=os.getenv("SUPABASE_TABLE", "chunks")
+    )
     
     # Initialize database (no-op for Supabase as it's managed through dashboard)
     print("\nInitializing Supabase database...")

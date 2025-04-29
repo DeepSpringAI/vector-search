@@ -4,19 +4,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
-from .config import Config
-
 
 class BaseChunker(ABC):
     """Base class for text chunking strategies."""
 
-    def __init__(self, config: Config):
-        """Initialize chunker with configuration.
+    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200):
+        """Initialize chunker.
 
         Args:
-            config: Configuration instance
+            chunk_size: Size of each chunk
+            chunk_overlap: Number of overlapping units between chunks
         """
-        self.config = config
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
 
     @abstractmethod
     def chunk_text(self, text: str, metadata: Optional[Dict] = None) -> List[Dict]:
@@ -56,16 +56,6 @@ class BaseChunker(ABC):
 class WordChunker(BaseChunker):
     """Chunk text based on word count."""
 
-    def __init__(self, config: Config):
-        """Initialize word chunker.
-
-        Args:
-            config: Configuration instance
-        """
-        super().__init__(config)
-        self.chunk_size = config.chunk_size
-        self.overlap = config.chunk_overlap
-
     def chunk_text(self, text: str, metadata: Optional[Dict] = None) -> List[Dict]:
         """Chunk text based on word count with overlap.
 
@@ -79,7 +69,7 @@ class WordChunker(BaseChunker):
         words = text.split()
         chunks = []
         
-        for i in range(0, len(words), self.chunk_size - self.overlap):
+        for i in range(0, len(words), self.chunk_size - self.chunk_overlap):
             chunk = ' '.join(words[i:i + self.chunk_size])
             if chunk:
                 chunks.append({
@@ -94,16 +84,6 @@ class WordChunker(BaseChunker):
 class CharacterChunker(BaseChunker):
     """Chunk text based on character count."""
 
-    def __init__(self, config: Config):
-        """Initialize character chunker.
-
-        Args:
-            config: Configuration instance
-        """
-        super().__init__(config)
-        self.chunk_size = config.chunk_size
-        self.overlap = config.chunk_overlap
-
     def chunk_text(self, text: str, metadata: Optional[Dict] = None) -> List[Dict]:
         """Chunk text based on character count with overlap.
 
@@ -116,7 +96,7 @@ class CharacterChunker(BaseChunker):
         """
         chunks = []
         
-        for i in range(0, len(text), self.chunk_size - self.overlap):
+        for i in range(0, len(text), self.chunk_size - self.chunk_overlap):
             chunk = text[i:i + self.chunk_size]
             if chunk:
                 chunks.append({
@@ -131,14 +111,15 @@ class CharacterChunker(BaseChunker):
 class CustomChunker(BaseChunker):
     """Custom chunking strategy."""
 
-    def __init__(self, config: Config, chunk_strategy: callable):
+    def __init__(self, chunk_strategy: callable, chunk_size: int = 1000, chunk_overlap: int = 200):
         """Initialize custom chunker.
 
         Args:
-            config: Configuration instance
             chunk_strategy: Custom function for chunking
+            chunk_size: Size of each chunk
+            chunk_overlap: Number of overlapping units between chunks
         """
-        super().__init__(config)
+        super().__init__(chunk_size, chunk_overlap)
         self.chunk_strategy = chunk_strategy
 
     def chunk_text(self, text: str, metadata: Optional[Dict] = None) -> List[Dict]:

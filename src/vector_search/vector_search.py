@@ -2,11 +2,12 @@
 from typing import Dict, List, Optional, Type, Union
 
 import numpy as np
+import os
+from dotenv import load_dotenv
 
 from .augmentation import (AzureOpenAIAugmenter, BaseAugmenter, OllamaAugmenter,
                          OpenAIAugmenter)
 from .chunker import BaseChunker, CharacterChunker, CustomChunker, WordChunker
-from .config import Config
 from .database import BaseDatabase, PostgresDatabase, SupabaseDatabase
 from .embeddings import (AzureOpenAIEmbedding, BaseEmbedding, CustomEmbedding,
                         OllamaEmbedding, OpenAIEmbedding)
@@ -19,7 +20,7 @@ class VectorSearch:
 
     def __init__(
         self,
-        config_path: str = "config.yaml",
+        env_path: str = ".env",
         source_type: str = "folder",
         chunker_type: str = "word",
         embedding_type: str = "ollama",
@@ -30,7 +31,7 @@ class VectorSearch:
         """Initialize vector search with components.
 
         Args:
-            config_path: Path to configuration file
+            env_path: Path to .env file
             source_type: Type of input source ("folder", "file", "google_drive", "azure_blob")
             chunker_type: Type of text chunker ("word", "character")
             embedding_type: Type of embedding provider ("ollama", "openai", "azure_openai")
@@ -38,7 +39,8 @@ class VectorSearch:
             augment: Whether to augment chunks
             augmenter_type: Type of chunk augmenter ("ollama", "openai", "azure_openai")
         """
-        self.config = Config(config_path)
+        # Load environment variables
+        load_dotenv(env_path)
         
         # Initialize source
         source_map: Dict[str, Type[BaseSource]] = {
@@ -47,14 +49,17 @@ class VectorSearch:
             "google_drive": GoogleDriveSource,
             "azure_blob": AzureBlobSource
         }
-        self.source = source_map[source_type](self.config)
+        self.source = source_map[source_type]()
         
-        # Initialize chunker
+        # Initialize chunker with chunk size and overlap from env
         chunker_map: Dict[str, Type[BaseChunker]] = {
             "word": WordChunker,
             "character": CharacterChunker
         }
-        self.chunker = chunker_map[chunker_type](self.config)
+        self.chunker = chunker_map[chunker_type](
+            chunk_size=int(os.getenv("CHUNK_SIZE", "1000")),
+            chunk_overlap=int(os.getenv("CHUNK_OVERLAP", "200"))
+        )
         
         # Initialize embedding provider
         embedding_map: Dict[str, Type[BaseEmbedding]] = {
@@ -62,14 +67,28 @@ class VectorSearch:
             "openai": OpenAIEmbedding,
             "azure_openai": AzureOpenAIEmbedding
         }
-        self.embedding = embedding_map[embedding_type](self.config)
+        self.embedding = embedding_map[embedding_type]()
         
         # Initialize database
-        database_map: Dict[str, Type[BaseDatabase]] = {
-            "postgres": PostgresDatabase,
-            "supabase": SupabaseDatabase
-        }
-        self.database = database_map[database_type](self.config)
+        if database_type == "postgres":
+            self.database = PostgresDatabase(
+                dbname=os.getenv("POSTGRES_DB"),
+                user=os.getenv("POSTGRES_USER"),
+                password=os.getenv("POSTGRES_PASSWORD"),
+                host=os.getenv("POSTGRES_HOST"),
+                port=int(os.getenv("POSTGRES_PORT", "5432")),
+                vector_dim=int(os.getenv("VECTOR_DIM", "1536"))
+            )
+        elif database_type == "supabase":
+            self.database = SupabaseDatabase(
+                url=os.getenv("SUPABASE_URL"),
+                key=os.getenv("SUPABASE_KEY"),
+                table_name=os.getenv("SUPABASE_TABLE", "chunks")
+            )
+        else:
+            raise ValueError(f"Unsupported database type: {database_type}")
+
+        # Initialize database
         self.database.initialize()
         
         # Initialize augmenter if enabled
@@ -80,7 +99,7 @@ class VectorSearch:
                 "openai": OpenAIAugmenter,
                 "azure_openai": AzureOpenAIAugmenter
             }
-            self.augmenter = augmenter_map[augmenter_type](self.config)
+            self.augmenter = augmenter_map[augmenter_type]()
         else:
             self.augmenter = None
 
@@ -144,7 +163,11 @@ class VectorSearch:
         Args:
             chunk_strategy: Custom chunking function
         """
-        self.chunker = CustomChunker(self.config, chunk_strategy)
+        self.chunker = CustomChunker(
+            chunk_strategy=chunk_strategy,
+            chunk_size=int(os.getenv("CHUNK_SIZE", "1000")),
+            chunk_overlap=int(os.getenv("CHUNK_OVERLAP", "200"))
+        )
 
     def add_custom_embedding(self, embed_fn: callable) -> None:
         """Add custom embedding function.
@@ -152,4 +175,4 @@ class VectorSearch:
         Args:
             embed_fn: Custom embedding function
         """
-        self.embedding = CustomEmbedding(self.config, embed_fn) 
+        self.embedding = CustomEmbedding(embed_fn) 

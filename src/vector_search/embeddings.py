@@ -7,19 +7,9 @@ import numpy as np
 import requests
 from openai import AzureOpenAI, OpenAI
 
-from .config import Config
-
 
 class BaseEmbedding(ABC):
     """Base class for embedding providers."""
-
-    def __init__(self, config: Config):
-        """Initialize embedding provider.
-
-        Args:
-            config: Configuration instance
-        """
-        self.config = config
 
     @abstractmethod
     def embed(self, texts: Union[str, List[str]]) -> np.ndarray:
@@ -37,15 +27,13 @@ class BaseEmbedding(ABC):
 class OllamaEmbedding(BaseEmbedding):
     """Ollama embedding provider."""
 
-    def __init__(self, config: Config, model: str = "bge-m3:latest"):
+    def __init__(self, model: str = "bge-m3:latest"):
         """Initialize Ollama embedding provider.
 
         Args:
-            config: Configuration instance
             model: Model name to use (default: bge-m3:latest)
         """
-        super().__init__(config)
-        base_url = config.ollama_base_url or "http://localhost:11434"
+        base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
         self.base_url = f"{base_url}/api/embed"
         self.model = model
 
@@ -80,14 +68,9 @@ class OllamaEmbedding(BaseEmbedding):
 class OpenAIEmbedding(BaseEmbedding):
     """OpenAI embedding provider."""
 
-    def __init__(self, config: Config):
-        """Initialize OpenAI embedding provider.
-
-        Args:
-            config: Configuration instance
-        """
-        super().__init__(config)
-        self.client = OpenAI(api_key=config.openai_api_key)
+    def __init__(self):
+        """Initialize OpenAI embedding provider."""
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def embed(self, texts: Union[str, List[str]]) -> np.ndarray:
         """Generate embeddings using OpenAI.
@@ -112,19 +95,14 @@ class OpenAIEmbedding(BaseEmbedding):
 class AzureOpenAIEmbedding(BaseEmbedding):
     """Azure OpenAI embedding provider."""
 
-    def __init__(self, config: Config):
-        """Initialize Azure OpenAI embedding provider.
-
-        Args:
-            config: Configuration instance
-        """
-        super().__init__(config)
+    def __init__(self):
+        """Initialize Azure OpenAI embedding provider."""
         self.client = AzureOpenAI(
-            api_key=config.azure_api_key,
-            api_version=config.azure_api_version,
-            azure_endpoint=config.azure_endpoint
+            api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+            api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
         )
-        self.deployment = config.azure_deployment or "text-embedding-ada-002"
+        self.deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "text-embedding-ada-002")
 
     def embed(self, texts: Union[str, List[str]]) -> np.ndarray:
         """Generate embeddings using Azure OpenAI.
@@ -149,14 +127,12 @@ class AzureOpenAIEmbedding(BaseEmbedding):
 class CustomEmbedding(BaseEmbedding):
     """Custom embedding provider."""
 
-    def __init__(self, config: Config, embed_fn: callable):
+    def __init__(self, embed_fn: callable):
         """Initialize custom embedding provider.
 
         Args:
-            config: Configuration instance
             embed_fn: Custom embedding function
         """
-        super().__init__(config)
         self.embed_fn = embed_fn
 
     def embed(self, texts: Union[str, List[str]]) -> np.ndarray:
