@@ -12,6 +12,14 @@ from supabase import Client, create_client
 class BaseDatabase(ABC):
     """Base class for database providers."""
 
+    TABLE_SCHEMA = """
+        id SERIAL PRIMARY KEY,
+        embedding vector(%d),
+        text TEXT NOT NULL,
+        metadata JSONB,
+        date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    """
+
     @abstractmethod
     def initialize(self) -> None:
         """Initialize database schema and required tables."""
@@ -51,7 +59,8 @@ class PostgresDatabase(BaseDatabase):
         password: str = None,
         host: str = "localhost",
         port: int = 5432,
-        vector_dim: int = 1536
+        vector_dim: int = 1536,
+        table_name: str = "chunks"
     ):
         """Initialize PostgreSQL database connection.
 
@@ -62,8 +71,10 @@ class PostgresDatabase(BaseDatabase):
             host: Database host
             port: Database port
             vector_dim: Dimension of vectors to store
+            table_name: Name of the table to store chunks
         """
         self.vector_dim = vector_dim
+        self.table_name = table_name
         self.conn = psycopg2.connect(
             dbname=dbname,
             user=user,
@@ -78,21 +89,17 @@ class PostgresDatabase(BaseDatabase):
             # Enable pgvector extension
             cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
 
-            # Create chunks table
+            # Create chunks table with consistent schema
             cur.execute(f"""
-                CREATE TABLE IF NOT EXISTS chunks (
-                    id SERIAL PRIMARY KEY,
-                    text TEXT NOT NULL,
-                    metadata JSONB,
-                    embedding vector({self.vector_dim}),
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                CREATE TABLE IF NOT EXISTS {self.table_name} (
+                    {self.TABLE_SCHEMA % self.vector_dim}
                 );
             """)
 
             # Create vector similarity search index
-            cur.execute("""
-                CREATE INDEX IF NOT EXISTS chunks_embedding_idx 
-                ON chunks 
+            cur.execute(f"""
+                CREATE INDEX IF NOT EXISTS {self.table_name}_embedding_idx 
+                ON {self.table_name} 
                 USING ivfflat (embedding vector_cosine_ops)
                 WITH (lists = 100);
             """)
@@ -108,18 +115,18 @@ class PostgresDatabase(BaseDatabase):
         """
         with self.conn.cursor() as cur:
             values = [
-                (chunk["text"], chunk["metadata"], embedding.tolist())
+                (embedding.tolist(), chunk["text"], chunk["metadata"])
                 for chunk, embedding in zip(chunks, embeddings)
             ]
             
             execute_values(
                 cur,
-                """
-                INSERT INTO chunks (text, metadata, embedding)
+                f"""
+                INSERT INTO {self.table_name} (embedding, text, metadata)
                 VALUES %s
                 """,
                 values,
-                template="(%s, %s::jsonb, %s::vector)"
+                template="(%s::vector, %s, %s::jsonb)"
             )
             
             self.conn.commit()
@@ -136,9 +143,9 @@ class PostgresDatabase(BaseDatabase):
         """
         with self.conn.cursor() as cur:
             cur.execute(
-                """
-                SELECT text, metadata, 1 - (embedding <=> %s) as similarity
-                FROM chunks
+                f"""
+                SELECT text, metadata, date, 1 - (embedding <=> %s) as similarity
+                FROM {self.table_name}
                 ORDER BY embedding <=> %s
                 LIMIT %s;
                 """,
@@ -146,10 +153,11 @@ class PostgresDatabase(BaseDatabase):
             )
             
             results = []
-            for text, metadata, similarity in cur.fetchall():
+            for text, metadata, date, similarity in cur.fetchall():
                 results.append({
                     "text": text,
                     "metadata": metadata,
+                    "date": date.isoformat(),
                     "similarity": float(similarity)
                 })
                 
@@ -163,7 +171,8 @@ class SupabaseDatabase(BaseDatabase):
         self,
         url: str = None,
         key: str = None,
-        table_name: str = "chunks"
+        table_name: str = "chunks",
+        vector_dim: int = 1536
     ):
         """Initialize Supabase client.
 
@@ -171,18 +180,33 @@ class SupabaseDatabase(BaseDatabase):
             url: Supabase project URL
             key: Supabase API key
             table_name: Name of the table to store chunks
+            vector_dim: Dimension of vectors to store
         """
         if not url or not key:
             raise ValueError("Supabase URL and key must be provided")
             
         self.client = create_client(url, key)
         self.table_name = table_name
+        self.vector_dim = vector_dim
 
     def initialize(self) -> None:
         """Initialize database schema using Supabase SQL editor.
 
-        Note: This method assumes you have already created the necessary
-        tables and enabled the pgvector extension in your Supabase project.
+        Note: For Supabase, you need to create the table and enable pgvector
+        through the dashboard SQL editor with the following SQL:
+
+        create extension if not exists vector;
+
+        create table if not exists chunks (
+            id bigint primary key generated always as identity,
+            embedding vector(1536),
+            text text not null,
+            metadata jsonb,
+            date timestamptz default now()
+        );
+
+        create index on chunks using ivfflat (embedding vector_cosine_ops)
+        with (lists = 100);
         """
         pass  # Schema should be initialized through Supabase dashboard
 
@@ -195,9 +219,9 @@ class SupabaseDatabase(BaseDatabase):
         """
         data = [
             {
+                "embedding": embedding.tolist(),
                 "text": chunk["text"],
-                "metadata": chunk["metadata"],
-                "embedding": embedding.tolist()
+                "metadata": chunk["metadata"]
             }
             for chunk, embedding in zip(chunks, embeddings)
         ]
@@ -231,6 +255,7 @@ class SupabaseDatabase(BaseDatabase):
             results.append({
                 "text": item["text"],
                 "metadata": item["metadata"],
+                "date": item["date"],
                 "similarity": item["similarity"]
             })
             
