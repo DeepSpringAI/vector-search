@@ -677,3 +677,111 @@ If you encounter authentication errors:
 1. Delete the `token.json` file
 2. Run the token generation script again
 3. Make sure your Google account has access to the folder
+
+# Text Augmentation
+
+The vector-search library supports text augmentation to enhance search quality by generating semantically similar variations of your text chunks. This can help improve recall and make the search more robust.
+
+## Available Augmenters
+
+### 1. Ollama Augmenter
+Uses Ollama's local LLMs to generate text variations. Ideal for when you want to keep data processing local or have privacy requirements.
+
+```python
+from vector_search.augmentation import OllamaAugmenter
+
+augmenter = OllamaAugmenter(
+    model_name="llama3.1:8b",  # Default model
+    base_url="http://localhost:11434"  # Optional, defaults to OLLAMA_BASE_URL env var
+)
+```
+
+### 2. OpenAI Augmenter
+Uses OpenAI's GPT models to generate high-quality text variations.
+
+```python
+from vector_search.augmentation import OpenAIAugmenter
+
+augmenter = OpenAIAugmenter(
+    api_key="your_api_key",  # Optional, defaults to OPENAI_API_KEY env var
+    model_name="gpt-3.5-turbo"  # Default model
+)
+```
+
+### 3. Azure OpenAI Augmenter
+Uses Azure's OpenAI service for text augmentation, suitable for enterprise deployments.
+
+```python
+from vector_search.augmentation import AzureOpenAIAugmenter
+
+augmenter = AzureOpenAIAugmenter(
+    api_key=None,  # Optional, defaults to AZURE_OPENAI_API_KEY env var
+    api_version=None,  # Optional, defaults to AZURE_OPENAI_API_VERSION env var
+    endpoint=None,  # Optional, defaults to AZURE_OPENAI_ENDPOINT env var
+    deployment="text-davinci-003"  # Default deployment
+)
+```
+
+## Usage Example
+
+```python
+# Prepare your text chunks
+chunks = [
+    {
+        "text": "Machine learning enables systems to learn from experience.",
+        "metadata": {
+            "source": "ml_doc",
+            "format": "txt"
+        },
+        "chunk_index": 0
+    }
+]
+
+# Initialize an augmenter
+augmenter = OllamaAugmenter()
+
+# Generate augmented chunks
+augmented_chunks = augmenter.augment(chunks)
+
+# Each original chunk will be preserved and augmented versions will be added
+for chunk in augmented_chunks:
+    print(f"Text: {chunk['text']}")
+    if chunk['metadata'].get('augmented'):
+        print(f"Augmented version of chunk {chunk['metadata']['original_chunk_index']}")
+```
+
+## Environment Variables
+
+Configure your augmenters using these environment variables in your `.env` file:
+
+```bash
+# Ollama Configuration
+OLLAMA_BASE_URL=http://localhost:11434
+
+# OpenAI Configuration
+OPENAI_API_KEY=your_openai_key
+
+# Azure OpenAI Configuration
+AZURE_OPENAI_API_KEY=your_azure_key
+AZURE_OPENAI_API_VERSION=your_api_version
+AZURE_OPENAI_ENDPOINT=your_endpoint
+```
+
+## How It Works
+
+1. Each augmenter preserves the original chunks and adds augmented versions
+2. Augmented chunks include metadata indicating:
+   - `augmented: true` - Marks it as an augmented version
+   - `original_chunk_index` - References the source chunk
+3. The augmentation process maintains the core meaning while varying the text structure and wording
+4. All metadata from the original chunk is preserved in the augmented versions
+
+## Best Practices
+
+1. Choose the appropriate augmenter based on your needs:
+   - Ollama for local processing and privacy
+   - OpenAI for high-quality results
+   - Azure OpenAI for enterprise deployments
+2. Test augmented results to ensure they maintain semantic accuracy
+3. Consider the trade-off between augmentation quantity and processing time
+4. Use environment variables for API keys and configuration
