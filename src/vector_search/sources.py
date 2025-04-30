@@ -153,6 +153,23 @@ class FileSource(BaseSource):
 class GoogleDriveSource(BaseSource):
     """Handler for loading documents from Google Drive."""
 
+    # Google Workspace MIME types and their export formats
+    GOOGLE_MIME_TYPES = {
+        'application/vnd.google-apps.document': 'text/markdown',  # Google Docs to Markdown
+        'application/vnd.google-apps.spreadsheet': 'text/markdown',  # Sheets to Markdown
+        'application/vnd.google-apps.presentation': 'text/markdown',  # Slides to Markdown
+    }
+
+    # Common MIME type mappings
+    MIME_TYPE_FORMATS = {
+        'text/plain': 'txt',
+        'text/markdown': 'md',
+        'application/json': 'json',
+        'application/pdf': 'pdf',
+        'text/markdown': 'md',
+        'text/html': 'html',
+    }
+
     def __init__(self, supported_formats: Set[str] = None, text_filter: Optional[Callable[[str], str]] = None):
         """Initialize Google Drive source.
 
@@ -171,6 +188,101 @@ class GoogleDriveSource(BaseSource):
         )
         self.service = build("drive", "v3", credentials=credentials)
 
+    def _is_google_workspace_file(self, mime_type: str) -> bool:
+        """Check if the file is a Google Workspace document.
+
+        Args:
+            mime_type: MIME type of the file
+
+        Returns:
+            True if it's a Google Workspace document, False otherwise
+        """
+        return mime_type in self.GOOGLE_MIME_TYPES
+
+    def _get_format_from_mime_type(self, mime_type: str) -> str:
+        """Get format from MIME type.
+
+        Args:
+            mime_type: MIME type of the file
+
+        Returns:
+            Format string (e.g., 'md', 'txt', 'pdf')
+        """
+        return self.MIME_TYPE_FORMATS.get(mime_type, 'txt')  # Default to txt if unknown
+
+    def _process_file_content(self, file_bytes: bytes, mime_type: str) -> str:
+        """Process file content based on its MIME type.
+
+        Args:
+            file_bytes: Raw file content
+            mime_type: MIME type of the file
+
+        Returns:
+            Extracted text content
+        """
+        if mime_type == 'application/pdf':
+            import fitz  # PyMuPDF
+            import io
+            
+            # Create a PDF document from the bytes
+            with io.BytesIO(file_bytes) as pdf_stream:
+                doc = fitz.open(stream=pdf_stream, filetype="pdf")
+                return " ".join(page.get_text() for page in doc)
+                
+        elif mime_type in ['text/plain', 'text/markdown', 'text/html']:
+            return file_bytes.decode("utf-8")
+            
+        elif mime_type == 'application/json':
+            content = json.loads(file_bytes.decode("utf-8"))
+            return json.dumps(content, indent=2)
+            
+        else:
+            return file_bytes.decode("utf-8")
+
+    def _download_google_workspace_file(self, file_id: str, mime_type: str) -> tuple[bytes, str]:
+        """Download and export Google Workspace file.
+
+        Args:
+            file_id: ID of the Google Workspace file
+            mime_type: MIME type of the file
+
+        Returns:
+            Tuple of (file content as bytes, export mime type)
+        """
+        import io
+
+        export_mime_type = self.GOOGLE_MIME_TYPES[mime_type]
+        request = self.service.files().export_media(fileId=file_id, mimeType=export_mime_type)
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+
+        return fh.getvalue(), export_mime_type
+
+    def _download_regular_file(self, file_id: str) -> bytes:
+        """Download regular (non-Google Workspace) file.
+
+        Args:
+            file_id: ID of the file
+
+        Returns:
+            File content as bytes
+        """
+        import io
+
+        request = self.service.files().get_media(fileId=file_id)
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+
+        return fh.getvalue()
+
     def load_documents(self, source_path: str) -> Iterator[Dict]:
         """Load documents from Google Drive folder.
 
@@ -180,34 +292,52 @@ class GoogleDriveSource(BaseSource):
         Yields:
             Dictionary containing document text and metadata
         """
-        import io
-
         query = f"'{source_path}' in parents"
         results = self.service.files().list(
             q=query,
             fields="files(id, name, mimeType)"
         ).execute()
 
-        for file in results.get("files", []):
-            file_format = Path(file["name"]).suffix.lower()[1:]
-            if self._is_supported_format(file["name"]):
-                request = self.service.files().get_media(fileId=file["id"])
-                fh = io.BytesIO()
-                downloader = MediaIoBaseDownload(fh, request)
-                
-                done = False
-                while not done:
-                    _, done = downloader.next_chunk()
+        print(f"Found files: {[f['name'] for f in results.get('files', [])]}")
 
-                content = fh.getvalue().decode("utf-8")
+        for file in results.get("files", []):
+            try:
+                mime_type = file["mimeType"]
+                file_name = file["name"]
+                file_id = file["id"]
+
+                print(f"Processing {file_name} (MIME type: {mime_type})")
+
+                # Handle Google Workspace documents
+                if self._is_google_workspace_file(mime_type):
+                    # Get the exported content as markdown
+                    file_bytes, export_mime_type = self._download_google_workspace_file(file_id, mime_type)
+                    content = self._process_file_content(file_bytes, export_mime_type)
+                    format_type = self._get_format_from_mime_type(export_mime_type)
+                
+                # Handle regular files
+                else:
+                    file_bytes = self._download_regular_file(file_id)
+                    content = self._process_file_content(file_bytes, mime_type)
+                    format_type = self._get_format_from_mime_type(mime_type)
+
+                # Apply text filter if provided
+                if self.text_filter is not None:
+                    content = self.text_filter(content)
+
                 yield {
                     "text": content,
                     "metadata": {
-                        "source": Path(file["name"]).stem,
-                        "format": file_format,
-                        "drive_id": file["id"]
+                        "source": Path(file_name).stem,
+                        "format": format_type,
+                        "drive_id": file_id,
+                        "mime_type": mime_type,
+                        "original_mime_type": mime_type
                     }
                 }
+            except Exception as e:
+                print(f"Error processing file {file.get('name', 'unknown')}: {str(e)}")
+                continue
 
 
 class AzureBlobSource(BaseSource):

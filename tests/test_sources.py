@@ -9,6 +9,9 @@ from vector_search.sources import (
     FolderSource, FileSource, GoogleDriveSource, AzureBlobSource
 )
 
+# Load environment variables from .env file
+load_dotenv()
+
 
 def create_test_file(path: Path, content: str) -> None:
     """Create a test file with given content."""
@@ -81,7 +84,7 @@ def test_google_drive_source():
         return
         
     source = GoogleDriveSource()
-    folder_id = "your_folder_id"  # Replace with actual folder ID
+    folder_id = "13IDuCnHVO9Ral_lbCSUnOLg0C94Ti680"  # Replace with actual folder ID
     
     print("\nGoogle Drive Source Results:")
     try:
@@ -174,14 +177,14 @@ def test_multiple_files_with_filter():
 
 def main():
     """Run all tests."""
-    print("Testing Folder Source:")
-    test_folder_source()
+    # print("Testing Folder Source:")
+    # test_folder_source()
     
     # print("\nTesting File Source:")
     # test_file_source()
     
-    # print("\nTesting Google Drive Source:")
-    # test_google_drive_source()
+    print("\nTesting Google Drive Source:")
+    test_google_drive_source()
     
     # print("\nTesting Azure Blob Source:")
     # test_azure_blob_source()
