@@ -10,3 +10,12 @@ wheels/
 .venv
 
 .env
+
+*.json
+*.txt
+*.md
+*.pdf
+*.html
+*.csv
+*.jsonl
+

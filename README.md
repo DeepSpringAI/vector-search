@@ -455,3 +455,225 @@ The test files serve as both documentation and examples of how to use each compo
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Text Filtering
+
+The source providers support custom text filtering through an optional `text_filter` parameter. This allows you to preprocess text content before it's processed further in the pipeline.
+
+### Basic Usage
+
+```python
+from vector_search.sources import FolderSource, FileSource
+
+# Create a simple lowercase filter
+def lowercase_filter(text: str) -> str:
+    return text.lower()
+
+# Initialize source with the filter
+source = FolderSource(text_filter=lowercase_filter)
+
+# All documents loaded will have lowercase text
+for doc in source.load_documents("path/to/folder"):
+    print(doc["text"])  # Text will be lowercase
+```
+
+### Example Filters
+
+1. Remove Punctuation:
+```python
+def remove_punctuation_filter(text: str) -> str:
+    return "".join(char for char in text if char.isalnum() or char.isspace())
+
+source = FileSource(text_filter=remove_punctuation_filter)
+```
+
+2. Clean Extra Whitespace:
+```python
+def clean_whitespace_filter(text: str) -> str:
+    return " ".join(text.split())
+
+source = FolderSource(text_filter=clean_whitespace_filter)
+```
+
+3. Custom Text Processing:
+```python
+def custom_filter(text: str) -> str:
+    # Remove specific patterns
+    text = text.replace("[REMOVE]", "")
+    # Convert to lowercase
+    text = text.lower()
+    # Clean whitespace
+    text = " ".join(text.split())
+    return text
+
+source = FileSource(text_filter=custom_filter)
+```
+
+### Filter Behavior
+
+- The filter function receives the raw text content as a string
+- It must return the processed text as a string
+- The filter is applied before the text is added to the document dictionary
+- Original metadata remains unchanged
+- The filter is applied consistently across all supported file formats
+- If no filter is provided, the text remains unchanged
+
+### Supported Source Types
+
+Text filters can be used with any source provider:
+- `FolderSource`: Applied to all files in the folder
+- `FileSource`: Applied to the single file
+- `GoogleDriveSource`: Applied to Google Drive documents
+- `AzureBlobSource`: Applied to Azure Blob Storage files
+
+## Google Drive Integration
+
+The system supports reading files directly from Google Drive, including native Google Workspace files (Docs, Sheets, Slides) which are automatically converted to Markdown format.
+
+### Setting up Google Drive Access
+
+1. Create a Google Cloud Project:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select an existing one
+   - Enable the Google Drive API:
+     ```
+     APIs & Services > Library > Search for "Google Drive API" > Enable
+     ```
+
+2. Create OAuth 2.0 Credentials:
+   - Go to `APIs & Services > Credentials`
+   - Click `Create Credentials > OAuth client ID`
+   - Select `Desktop Application`
+   - Download the credentials JSON file
+
+3. Generate Access Token:
+   ```python
+   from google_auth_oauthlib.flow import InstalledAppFlow
+   import json
+
+   # If modifying scopes, delete token.json.
+   SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
+
+   def generate_token():
+       # Load client configuration from downloaded credentials
+       flow = InstalledAppFlow.from_client_config(
+           # Your downloaded credentials
+           client_config={
+               "installed": {
+                   "client_id": "YOUR_CLIENT_ID",
+                   "project_id": "YOUR_PROJECT_ID",
+                   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                   "token_uri": "https://oauth2.googleapis.com/token",
+                   "client_secret": "YOUR_CLIENT_SECRET",
+                   "redirect_uris": ["http://localhost"]
+               }
+           },
+           scopes=SCOPES
+       )
+
+       # Run local server for authentication
+       creds = flow.run_local_server(port=0)
+
+       # Save the credentials
+       token_data = {
+           'token': creds.token,
+           'refresh_token': creds.refresh_token,
+           'token_uri': creds.token_uri,
+           'client_id': creds.client_id,
+           'client_secret': flow.client_config['installed']['client_secret'],
+           'scopes': creds.scopes
+       }
+
+       with open('token.json', 'w') as token_file:
+           json.dump(token_data, token_file)
+
+   if __name__ == '__main__':
+       generate_token()
+   ```
+
+4. Set up environment variables:
+   ```env
+   GOOGLE_APPLICATION_CREDENTIALS=path/to/your/token.json
+   ```
+
+### Using Google Drive Source
+
+```python
+from vector_search import VectorSearch
+
+# Initialize with Google Drive source
+vector_search = VectorSearch(
+    source_type="google_drive",
+    chunker_type="word",
+    embedding_type="ollama",
+    database_type="postgres"
+)
+
+# Process documents from a Google Drive folder
+folder_id = "your_folder_id"  # Get this from the folder's URL
+vector_search.process_source(folder_id)
+```
+
+### Supported File Types
+
+The Google Drive integration supports various file types:
+
+1. Google Workspace Files (automatically converted to Markdown):
+   - Google Docs (`application/vnd.google-apps.document`)
+   - Google Sheets (`application/vnd.google-apps.spreadsheet`)
+   - Google Slides (`application/vnd.google-apps.presentation`)
+
+2. Regular Files:
+   - Text files (`text/plain`)
+   - Markdown files (`text/markdown`)
+   - JSON files (`application/json`)
+   - PDF files (`application/pdf`)
+   - HTML files (`text/html`)
+
+### Finding Folder ID
+
+To get a folder's ID:
+1. Open the folder in Google Drive
+2. The URL will look like: `https://drive.google.com/drive/folders/1234...`
+3. The long string after `folders/` is your folder ID
+
+### Example Usage
+
+```python
+from vector_search.sources import GoogleDriveSource
+
+# Initialize the source
+source = GoogleDriveSource()
+
+# Process files from a folder
+for doc in source.load_documents("your_folder_id"):
+    print(f"File: {doc['metadata']['source']}")
+    print(f"Format: {doc['metadata']['format']}")
+    print(f"Original MIME type: {doc['metadata']['original_mime_type']}")
+    print(f"Content preview: {doc['text'][:100]}...")
+```
+
+### Metadata
+
+Each document includes metadata:
+```python
+{
+    "source": "filename_without_extension",
+    "format": "md",  # Format after conversion (e.g., 'md' for Google Docs)
+    "drive_id": "google_drive_file_id",
+    "mime_type": "text/markdown",  # Export format
+    "original_mime_type": "application/vnd.google-apps.document"  # Original format
+}
+```
+
+### Error Handling
+
+The system handles errors gracefully:
+- Invalid files are skipped with error messages
+- Unsupported formats are ignored
+- Authentication errors are reported clearly
+
+If you encounter authentication errors:
+1. Delete the `token.json` file
+2. Run the token generation script again
+3. Make sure your Google account has access to the folder
