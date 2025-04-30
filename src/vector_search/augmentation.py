@@ -49,19 +49,27 @@ class OllamaAugmenter(BaseAugmenter):
         augmented_chunks = []
         
         for chunk in chunks:
-            prompt = (
-                "Rewrite the following text in a different way while preserving "
-                "its core meaning and key information:\n\n"
-                f"{chunk['text']}"
-            )
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are an expert at rewriting text. Only respond with the rewritten text, no explanations or additional text."
+                },
+                {
+                    "role": "user",
+                    "content": f"Rewrite this text in a different way while preserving its core meaning: {chunk['text']}"
+                }
+            ]
             
             response = requests.post(
-                f"{self.base_url}/api/generate",
-                json={"model": self.model_name, "prompt": prompt}
+                f"{self.base_url}/api/chat",
+                json={
+                    "model": self.model_name,
+                    "messages": messages,
+                    "stream": False
+                }
             )
             response.raise_for_status()
-            
-            augmented_text = response.json()["response"].strip()
+            augmented_text = response.json()["message"]["content"].strip()
             
             # Keep original chunk
             augmented_chunks.append(chunk)
