@@ -3,7 +3,7 @@ import json
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, Iterator, List, Set, Union
+from typing import Dict, Iterator, List, Set, Union, Callable, Optional
 
 from azure.storage.blob import BlobServiceClient
 from google.oauth2.credentials import Credentials
@@ -14,13 +14,15 @@ from googleapiclient.http import MediaIoBaseDownload
 class BaseSource(ABC):
     """Base class for input sources."""
 
-    def __init__(self, supported_formats: Set[str] = None):
+    def __init__(self, supported_formats: Set[str] = None, text_filter: Optional[Callable[[str], str]] = None):
         """Initialize input source.
 
         Args:
             supported_formats: Set of supported file formats (e.g., {'txt', 'pdf'})
+            text_filter: Optional function that takes a string and returns a filtered string
         """
         self.supported_formats = supported_formats or {'txt', 'md', 'markdown', 'json', 'pdf'}
+        self.text_filter = text_filter
 
     @abstractmethod
     def load_documents(self, source_path: str) -> Iterator[Dict]:
@@ -75,6 +77,10 @@ class BaseSource(ABC):
             doc = fitz.open(file_path)
             content = " ".join(page.get_text() for page in doc)
 
+        # Apply text filter if provided
+        if self.text_filter is not None:
+            content = self.text_filter(content)
+
         return {
             "text": content,
             "metadata": {
@@ -87,6 +93,15 @@ class BaseSource(ABC):
 
 class FolderSource(BaseSource):
     """Handler for loading documents from a folder."""
+
+    def __init__(self, supported_formats: Set[str] = None, text_filter: Optional[Callable[[str], str]] = None):
+        """Initialize folder source.
+
+        Args:
+            supported_formats: Set of supported file formats
+            text_filter: Optional function that takes a string and returns a filtered string
+        """
+        super().__init__(supported_formats, text_filter)
 
     def load_documents(self, source_path: str) -> Iterator[Dict]:
         """Load documents from a folder recursively.
@@ -109,6 +124,15 @@ class FolderSource(BaseSource):
 class FileSource(BaseSource):
     """Handler for loading a single document."""
 
+    def __init__(self, supported_formats: Set[str] = None, text_filter: Optional[Callable[[str], str]] = None):
+        """Initialize file source.
+
+        Args:
+            supported_formats: Set of supported file formats
+            text_filter: Optional function that takes a string and returns a filtered string
+        """
+        super().__init__(supported_formats, text_filter)
+
     def load_documents(self, source_path: str) -> Iterator[Dict]:
         """Load a single document.
 
@@ -129,13 +153,14 @@ class FileSource(BaseSource):
 class GoogleDriveSource(BaseSource):
     """Handler for loading documents from Google Drive."""
 
-    def __init__(self, supported_formats: Set[str] = None):
+    def __init__(self, supported_formats: Set[str] = None, text_filter: Optional[Callable[[str], str]] = None):
         """Initialize Google Drive source.
 
         Args:
             supported_formats: Set of supported file formats
+            text_filter: Optional function that takes a string and returns a filtered string
         """
-        super().__init__(supported_formats)
+        super().__init__(supported_formats, text_filter)
         credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
         if not credentials_path:
             raise ValueError("Google Drive credentials path not set")
@@ -188,13 +213,14 @@ class GoogleDriveSource(BaseSource):
 class AzureBlobSource(BaseSource):
     """Handler for loading documents from Azure Blob Storage."""
 
-    def __init__(self, supported_formats: Set[str] = None):
+    def __init__(self, supported_formats: Set[str] = None, text_filter: Optional[Callable[[str], str]] = None):
         """Initialize Azure Blob source.
 
         Args:
             supported_formats: Set of supported file formats
+            text_filter: Optional function that takes a string and returns a filtered string
         """
-        super().__init__(supported_formats)
+        super().__init__(supported_formats, text_filter)
         connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
         self.container_name = os.getenv("AZURE_STORAGE_CONTAINER")
 
