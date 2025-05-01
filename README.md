@@ -4,7 +4,7 @@
   <img src="inc/logo.png" alt="Vector Search Logo" width="200"/>
 </div>
 
-A flexible and modular vector search system for document processing, embedding generation, and similarity search.
+A modular library for building vector search systems with separate components for document processing, embedding generation, and similarity search.
 
 ## Key Features
 
@@ -163,230 +163,278 @@ SUPABASE_KEY=your_api_key
 SUPABASE_TABLE=chunks
 ```
 
-## Basic Usage
+## Basic Usage Example
+
+Here's a complete example of how to use the components together:
 
 ```python
-from vector_search import VectorSearch
+from vector_search.sources import FolderSource
+from vector_search.chunker import WordChunker
+from vector_search.embeddings import OllamaEmbedding
+from vector_search.database import PostgresDatabase
 
-# Initialize with default components
-vector_search = VectorSearch(
-    source_type="folder",      # Use folder source
-    chunker_type="word",       # Use word-based chunking
-    embedding_type="ollama",   # Use Ollama for embeddings
-    database_type="postgres",  # Use PostgreSQL database
-    augment=False             # No text augmentation
-)
+# 1. Initialize components
+source = FolderSource(supported_formats={'txt', 'pdf', 'md'})
+chunker = WordChunker(chunk_size=1000, chunk_overlap=200)
+embedding = OllamaEmbedding(model_name="bge-m3:latest")
+db = PostgresDatabase()
 
-# Process documents from a folder
-vector_search.process_source("path/to/documents")
+# 2. Process documents
+documents = source.load_documents("path/to/docs")
 
-# Search for similar content
-results = vector_search.search(
-    query="What is machine learning?",
-    limit=5,
-    min_similarity=0.7
-)
+# 3. Create chunks
+all_chunks = []
+for doc in documents:
+    chunks = chunker.chunk_text(doc["text"], doc["metadata"])
+    all_chunks.extend(chunks)
 
-# Print results
+# 4. Generate embeddings
+texts = [chunk["text"] for chunk in all_chunks]
+embeddings = embedding.embed(texts)
+
+# 5. Store in database
+db.store_embeddings(all_chunks, embeddings)
+
+# 6. Search
+query = "What is machine learning?"
+query_embedding = embedding.embed(query)
+results = db.search(query_embedding, limit=5)
+
+# 7. Process results
 for result in results:
-    print(f"Text: {result['text']}")
+    print(f"Text: {result['text'][:200]}...")
     print(f"Similarity: {result['similarity']}")
     print(f"Source: {result['metadata']['source']}")
-    print(f"Date: {result['date']}")
     print("---")
 ```
 
 ## Components
 
-### Source Providers
+### 1. Source Providers
 
-#### Local Sources
+Choose from different source providers to load your documents:
+
+#### Folder Source
 ```python
-from vector_search import VectorSearch
+from vector_search.sources import FolderSource
 
-# Using folder source
-vs = VectorSearch(source_type="folder")
-vs.process_source("path/to/folder")
+source = FolderSource(
+    supported_formats={'txt', 'pdf', 'md', 'json'},
+    text_filter=lambda x: x.lower()  # Optional text preprocessing
+)
 
-# Using single file source
-vs = VectorSearch(source_type="file")
-vs.process_source("path/to/file.txt")
+for doc in source.load_documents("path/to/folder"):
+    print(f"Source: {doc['metadata']['source']}")
+    print(f"Content: {doc['text'][:100]}...")
 ```
 
-#### Google Drive Integration
+#### Google Drive Source
 ```python
-from vector_search import VectorSearch
+from vector_search.sources import GoogleDriveSource
 
-vs = VectorSearch(source_type="google_drive")
-vs.process_source("your_folder_id")  # From folder URL
+source = GoogleDriveSource()
+folder_id = "your_folder_id"  # From Google Drive URL
+
+for doc in source.load_documents(folder_id):
+    print(f"File: {doc['metadata']['source']}")
+    print(f"Format: {doc['metadata']['format']}")
+    print(f"Drive ID: {doc['metadata']['drive_id']}")
 ```
 
-Supports:
-- Google Docs (→ Markdown)
-- Google Sheets (→ Markdown)
-- Google Slides (→ Markdown)
-- PDFs, Text files, etc.
-
-#### Azure Blob Storage
+#### Azure Blob Source
 ```python
-from vector_search import VectorSearch
+from vector_search.sources import AzureBlobSource
 
-vs = VectorSearch(source_type="azure_blob")
-vs.process_source("container/path")
+source = AzureBlobSource()
+for doc in source.load_documents("container/path"):
+    print(f"Blob: {doc['metadata']['blob_path']}")
 ```
 
-### Text Processing
+### 2. Text Chunking
 
-#### Chunking Strategies
+Split your documents into manageable chunks:
+
+#### Word-based Chunking
 ```python
-from vector_search import VectorSearch
+from vector_search.chunker import WordChunker
 
-# Word-based chunking
-vs = VectorSearch(
-    chunker_type="word",
+chunker = WordChunker(
     chunk_size=1000,
     chunk_overlap=200
 )
 
-# Character-based chunking
-vs = VectorSearch(
-    chunker_type="character",
+# Process a single document
+chunks = chunker.chunk_text(
+    text="Your document text here...",
+    metadata={"source": "doc.txt"}
+)
+
+for chunk in chunks:
+    print(f"Chunk {chunk['chunk_index']}: {chunk['text'][:100]}...")
+```
+
+#### Character-based Chunking
+```python
+from vector_search.chunker import CharacterChunker
+
+chunker = CharacterChunker(
     chunk_size=4000,
     chunk_overlap=400
 )
+
+chunks = chunker.chunk_text(text, metadata)
 ```
 
-#### Text Augmentation
-```python
-from vector_search import VectorSearch
+### 3. Embedding Generation
 
-# Using Ollama for augmentation
-vs = VectorSearch(
-    augment=True,
-    augmenter_type="ollama",
-    augmenter_config={
-        "model_name": "llama3.1:8b"
-    }
-)
-
-# Using OpenAI
-vs = VectorSearch(
-    augment=True,
-    augmenter_type="openai",
-    augmenter_config={
-        "model_name": "gpt-3.5-turbo"
-    }
-)
-```
-
-#### Tag Generation
-```python
-from vector_search.tags import OllamaTagGenerator, OpenAITagGenerator
-
-# Free-form tags
-generator = OllamaTagGenerator(max_tags=3)
-tagged_chunks = generator.generate_tags(chunks)
-
-# Predefined tags
-generator = OpenAITagGenerator(
-    max_tags=3,
-    predefined_tags={"ai", "machine learning", "python"}
-)
-tagged_chunks = generator.generate_tags(chunks)
-```
-
-### Embedding Providers
+Generate vector embeddings using different providers:
 
 #### Ollama (Local)
 ```python
-from vector_search import VectorSearch
+from vector_search.embeddings import OllamaEmbedding
 
-vs = VectorSearch(
-    embedding_type="ollama",
-    embedding_config={
-        "model_name": "bge-m3:latest"
-    }
+embedding = OllamaEmbedding(
+    model_name="bge-m3:latest",
+    base_url="http://localhost:11434"
 )
+
+# Single text
+vector = embedding.embed("Sample text")
+
+# Multiple texts
+vectors = embedding.embed([
+    "First text",
+    "Second text",
+    "Third text"
+])
 ```
 
 #### OpenAI
 ```python
-vs = VectorSearch(
-    embedding_type="openai",
-    embedding_config={
-        "model_name": "text-embedding-3-small"
-    }
+from vector_search.embeddings import OpenAIEmbedding
+
+embedding = OpenAIEmbedding(
+    model_name="text-embedding-3-small"
 )
+
+vectors = embedding.embed(texts)
 ```
 
 #### Azure OpenAI
 ```python
-vs = VectorSearch(
-    embedding_type="azure_openai",
-    embedding_config={
-        "deployment": "your-deployment"
-    }
+from vector_search.embeddings import AzureOpenAIEmbedding
+
+embedding = AzureOpenAIEmbedding(
+    deployment="your-deployment"
 )
+
+vectors = embedding.embed(texts)
 ```
 
-### Database Integration
+### 4. Database Storage
+
+Store and search your embeddings:
 
 #### PostgreSQL
 ```python
-from vector_search import VectorSearch
+from vector_search.database import PostgresDatabase
 
-vs = VectorSearch(database_type="postgres")
-```
+db = PostgresDatabase(
+    dbname="your_db",
+    user="your_user",
+    password="your_password",
+    host="localhost",
+    port=5432,
+    vector_dim=1536
+)
 
-Required schema:
-```sql
-CREATE TABLE chunks (
-    id SERIAL PRIMARY KEY,
-    embedding vector(1536),
-    text TEXT NOT NULL,
-    metadata JSONB,
-    date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+# Initialize schema
+db.initialize()
 
-CREATE INDEX ON chunks USING ivfflat (embedding vector_cosine_ops)
-WITH (lists = 100);
+# Store embeddings
+db.store_embeddings(chunks, embeddings)
+
+# Search
+results = db.search(
+    query_embedding,
+    limit=5,
+    min_similarity=0.7
+)
 ```
 
 #### Supabase
 ```python
-vs = VectorSearch(database_type="supabase")
+from vector_search.database import SupabaseDatabase
+
+db = SupabaseDatabase(
+    url=os.getenv("SUPABASE_URL"),
+    key=os.getenv("SUPABASE_KEY"),
+    table="chunks"
+)
+
+# Store and search work the same as PostgreSQL
+db.store_embeddings(chunks, embeddings)
+results = db.search(query_embedding)
 ```
 
-Additional function for Supabase:
-```sql
-create or replace function match_chunks (
-  query_embedding vector(1536),
-  match_threshold float,
-  match_count int
+### 5. Text Augmentation
+
+Enhance your search with text variations:
+
+```python
+from vector_search.augmentation import OllamaAugmenter
+
+augmenter = OllamaAugmenter(
+    model_name="llama3.1:8b"
 )
-returns table (
-  id bigint,
-  text text,
-  metadata jsonb,
-  date timestamptz,
-  similarity float
+
+# Augment chunks
+original_chunks = [
+    {
+        "text": "Machine learning enables systems to learn from experience.",
+        "metadata": {"source": "doc.txt"},
+        "chunk_index": 0
+    }
+]
+
+augmented_chunks = augmenter.augment(original_chunks)
+
+# Process both original and augmented chunks
+all_chunks = []
+for chunk in augmented_chunks:
+    print(f"{'Augmented' if chunk['metadata'].get('augmented') else 'Original'}: {chunk['text']}")
+    all_chunks.append(chunk)
+```
+
+### 6. Tag Generation
+
+Add semantic tags to your chunks:
+
+```python
+from vector_search.tags import OllamaTagGenerator, OllamaPredefinedTagSelector
+
+# Free-form tagging
+generator = OllamaTagGenerator(max_tags=3)
+tagged_chunks = generator.generate_tags(chunks)
+
+# Predefined tag selection
+predefined_tags = {
+    "machine learning",
+    "artificial intelligence",
+    "programming"
+}
+
+selector = OllamaPredefinedTagSelector(
+    predefined_tags=predefined_tags,
+    max_tags=2
 )
-language plpgsql
-as $$
-begin
-  return query
-  select
-    chunks.id,
-    chunks.text,
-    chunks.metadata,
-    chunks.date,
-    1 - (chunks.embedding <=> query_embedding) as similarity
-  from chunks
-  where 1 - (chunks.embedding <=> query_embedding) > match_threshold
-  order by chunks.embedding <=> query_embedding
-  limit match_count;
-end;
-$$;
+
+tagged_chunks = selector.generate_tags(chunks)
+
+# Process tagged chunks
+for chunk in tagged_chunks:
+    print(f"Text: {chunk['text'][:100]}...")
+    print(f"Tags: {chunk['metadata']['tags']}")
 ```
 
 ## Advanced Features
