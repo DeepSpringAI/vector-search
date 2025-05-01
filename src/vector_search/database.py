@@ -199,7 +199,7 @@ class SupabaseDatabase(BaseDatabase):
 
         create table if not exists chunks (
             id bigint primary key generated always as identity,
-            embedding vector(1536),
+            embedding vector(1024),
             text text not null,
             metadata jsonb,
             date timestamptz default now()

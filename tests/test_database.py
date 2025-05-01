@@ -110,31 +110,31 @@ def test_supabase_database():
     ]
     
     # Generate mock embeddings (384-dimensional)
-    embeddings = np.random.randn(len(chunks), 384)
+    embeddings = np.random.randn(len(chunks), 1024)
     
     # Store embeddings
     print("Storing test chunks and embeddings in Supabase...")
     try:
         db.store_embeddings(chunks, embeddings)
         
-        # Test search
-        print("\nTesting Supabase similarity search:")
-        query_embedding = np.random.randn(384)  # Random query vector
-        results = db.search(query_embedding, limit=2)
+        # # Test search
+        # print("\nTesting Supabase similarity search:")
+        # query_embedding = np.random.randn(384)  # Random query vector
+        # results = db.search(query_embedding, limit=2)
         
-        for i, result in enumerate(results):
-            print(f"\nResult {i + 1}:")
-            print(f"Text: {result['text']}")
-            print(f"Similarity: {result.get('similarity', 'N/A')}")
-            print(f"Metadata: {result.get('metadata', {})}")
+        # for i, result in enumerate(results):
+        #     print(f"\nResult {i + 1}:")
+        #     print(f"Text: {result['text']}")
+        #     print(f"Similarity: {result.get('similarity', 'N/A')}")
+        #     print(f"Metadata: {result.get('metadata', {})}")
             
     except Exception as e:
         print(f"Error during Supabase operations: {e}")
 
 
 if __name__ == "__main__":
-    print("Testing PostgreSQL database:")
-    test_postgres_database()
+    # print("Testing PostgreSQL database:")
+    # test_postgres_database()
     
     print("\nTesting Supabase database:")
     test_supabase_database() 

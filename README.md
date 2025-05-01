@@ -327,6 +327,84 @@ CREATE INDEX ON chunks USING ivfflat (embedding vector_cosine_ops)
 WITH (lists = 100);
 ```
 
+### Supabase Vector Search Function
+
+For Supabase, you need to create a stored function for vector similarity search. Add this function in the Supabase SQL editor:
+
+```sql
+-- Enable the pgvector extension
+create extension if not exists vector;
+
+-- Create the match_chunks function
+create or replace function match_chunks (
+  query_embedding vector(1536),
+  match_threshold float,
+  match_count int
+)
+returns table (
+  id bigint,
+  text text,
+  metadata jsonb,
+  date timestamptz,
+  similarity float
+)
+language plpgsql
+as $$
+begin
+  return query
+  select
+    chunks.id,
+    chunks.text,
+    chunks.metadata,
+    chunks.date,
+    1 - (chunks.embedding <=> query_embedding) as similarity
+  from chunks
+  where 1 - (chunks.embedding <=> query_embedding) > match_threshold
+  order by chunks.embedding <=> query_embedding
+  limit match_count;
+end;
+$$;
+```
+
+This function:
+1. Takes a query embedding vector, similarity threshold, and result limit as parameters
+2. Returns matching chunks with their similarity scores
+3. Uses the cosine distance operator `<=>` for similarity calculation
+4. Orders results by similarity (highest first)
+5. Limits results based on the match_count parameter
+
+### Usage in Code
+
+The function is automatically used by the SupabaseDatabase class:
+
+```python
+from vector_search.database import SupabaseDatabase
+
+db = SupabaseDatabase(
+    url=os.getenv("SUPABASE_URL"),
+    key=os.getenv("SUPABASE_KEY"),
+    table=os.getenv("SUPABASE_TABLE", "chunks")
+)
+
+# Search will use the match_chunks function internally
+results = db.search(query_embedding, limit=5)
+```
+
+### Function Parameters
+
+- `query_embedding`: The vector to search for (dimension must match table)
+- `match_threshold`: Minimum similarity score (0.0 to 1.0)
+- `match_count`: Maximum number of results to return
+
+### Return Values
+
+Each result includes:
+- `id`: The chunk's unique identifier
+- `text`: The chunk's text content
+- `metadata`: Associated metadata as JSONB
+- `date`: Timestamp of when the chunk was added
+- `similarity`: Cosine similarity score (0.0 to 1.0)
+
 ## Test Files and Examples
 
 The `tests/` directory contains several test files that demonstrate how to use different components of the system:
