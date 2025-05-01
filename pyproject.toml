@@ -8,9 +8,13 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "langchain>=0.3.24",
+    "langchain-community>=0.3.23",
+    "langchain-openai>=0.3.14",
     "numpy>=2.2.5",
     "openai>=1.76.0",
     "psycopg2-binary>=2.9.10",
+    "python-dotenv>=1.1.0",
     "sentence-transformers>=4.1.0",
 ]
 
