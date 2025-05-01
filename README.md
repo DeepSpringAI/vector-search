@@ -1,18 +1,86 @@
+# Vector Search
+
 <div align="center">
   <img src="inc/logo.png" alt="Vector Search Logo" width="200"/>
 </div>
 
-# Vector Search
-
 A flexible and modular vector search system for document processing, embedding generation, and similarity search.
 
-## Features
+## Key Features
 
-- Multiple source providers (Folder, File, Google Drive, Azure Blob)
-- Flexible text chunking strategies (Word-based, Character-based, Custom)
-- Various embedding providers (Ollama, OpenAI, Azure OpenAI, Custom)
-- Database options (PostgreSQL with pgvector, Supabase)
-- Optional text augmentation for better search results
+### Input Sources
+- 📁 **Multiple Source Providers**
+  - Local folder and file processing
+  - Google Drive integration with Google Workspace support
+  - Azure Blob Storage integration
+  - Custom source provider support
+
+### Text Processing
+- 📝 **Flexible Text Chunking**
+  - Word-based chunking
+  - Character-based chunking
+  - Custom chunking strategies
+  - Configurable chunk size and overlap
+
+- 🔄 **Text Augmentation**
+  - Multiple AI providers (Ollama, OpenAI, Azure OpenAI)
+  - Semantic variation generation
+  - Original content preservation
+  - Customizable augmentation parameters
+
+- 🏷️ **AI-Powered Tag Generation**
+  - Free-form tag generation
+  - Predefined tag selection
+  - Multiple model support (Ollama, OpenAI, Azure)
+  - Customizable tag parameters
+
+### Embeddings
+- 🧠 **Multiple Embedding Providers**
+  - Ollama (local processing)
+  - OpenAI
+  - Azure OpenAI
+  - Custom embedding support
+
+### Storage & Search
+- 💾 **Database Options**
+  - PostgreSQL with pgvector
+  - Supabase integration
+  - Vector similarity search
+  - Metadata storage and filtering
+
+### Additional Features
+- 🔍 **Text Filtering**
+  - Custom preprocessing filters
+  - Format-specific handling
+  - Metadata preservation
+
+- 🔐 **Security**
+  - Environment-based configuration
+  - API key management
+  - Secure credential handling
+
+- 🛠️ **Extensibility**
+  - Custom component support
+  - Modular architecture
+  - Easy integration options
+
+## Table of Contents
+
+1. [Installation](#installation)
+2. [Environment Setup](#environment-setup)
+3. [Basic Usage](#basic-usage)
+4. [Components](#components)
+   - [Source Providers](#source-providers)
+   - [Text Processing](#text-processing)
+   - [Embedding Providers](#embedding-providers)
+   - [Database Integration](#database-integration)
+5. [Advanced Features](#advanced-features)
+   - [Text Augmentation](#text-augmentation)
+   - [Tag Generation](#tag-generation)
+   - [Text Filtering](#text-filtering)
+6. [Custom Components](#custom-components)
+7. [Testing](#testing)
+8. [Contributing](#contributing)
 
 ## Installation
 
@@ -64,6 +132,7 @@ from vector_search import VectorSearch
 ### Environment Setup
 
 Create a `.env` file in your project root:
+
 ```env
 # Database Configuration
 POSTGRES_DB=your_db_name
@@ -77,26 +146,18 @@ VECTOR_DIM=1536
 CHUNK_SIZE=1000
 CHUNK_OVERLAP=200
 
-# OpenAI Configuration (if using OpenAI embeddings)
+# AI Provider Configuration
 OPENAI_API_KEY=your_api_key
-
-# Azure OpenAI Configuration (if using Azure OpenAI)
 AZURE_OPENAI_API_KEY=your_azure_key
 AZURE_OPENAI_API_VERSION=2024-02-01
 AZURE_OPENAI_ENDPOINT=your_azure_endpoint
 AZURE_OPENAI_DEPLOYMENT=your_deployment_name
-
-# Ollama Configuration (if using Ollama)
 OLLAMA_BASE_URL=http://localhost:11434
 
-# Google Drive Configuration (if using Google Drive source)
+# Storage Provider Configuration
 GOOGLE_APPLICATION_CREDENTIALS=path/to/credentials.json
-
-# Azure Blob Configuration (if using Azure Blob source)
 AZURE_STORAGE_CONNECTION_STRING=your_connection_string
 AZURE_STORAGE_CONTAINER=your_container_name
-
-# Supabase Configuration (if using Supabase)
 SUPABASE_URL=your_project_url
 SUPABASE_KEY=your_api_key
 SUPABASE_TABLE=chunks
@@ -135,185 +196,149 @@ for result in results:
     print("---")
 ```
 
-## Creating Custom Components
+## Components
 
-### 1. Custom Source Provider
+### Source Providers
 
-Create a custom source by inheriting from `BaseSource`:
-
+#### Local Sources
 ```python
-from vector_search.sources import BaseSource
-from typing import Dict, Iterator
+from vector_search import VectorSearch
 
-class CustomSource(BaseSource):
-    def __init__(self, supported_formats=None):
-        super().__init__(supported_formats)
-        # Add custom initialization
+# Using folder source
+vs = VectorSearch(source_type="folder")
+vs.process_source("path/to/folder")
 
-    def load_documents(self, source_path: str) -> Iterator[Dict]:
-        # Implement document loading logic
-        documents = []  # Your logic here
-        
-        for doc in documents:
-            yield {
-                "text": doc.content,
-                "metadata": {
-                    "source": doc.name,
-                    "format": doc.format,
-                    "custom_field": doc.custom_field
-                }
-            }
+# Using single file source
+vs = VectorSearch(source_type="file")
+vs.process_source("path/to/file.txt")
 ```
 
-### 2. Custom Chunking Strategy
-
-Create a custom chunker by inheriting from `BaseChunker`:
-
+#### Google Drive Integration
 ```python
-from vector_search.chunker import BaseChunker
-from typing import Dict, List
+from vector_search import VectorSearch
 
-class CustomChunker(BaseChunker):
-    def __init__(self, chunk_size=1000, chunk_overlap=200):
-        super().__init__(chunk_size, chunk_overlap)
-        # Add custom initialization
-
-    def chunk_text(self, text: str, metadata: Dict = None) -> List[Dict]:
-        # Implement chunking logic
-        chunks = []  # Your logic here
-        
-        return [
-            {
-                "text": chunk,
-                "metadata": metadata or {},
-                "chunk_index": i
-            }
-            for i, chunk in enumerate(chunks)
-        ]
+vs = VectorSearch(source_type="google_drive")
+vs.process_source("your_folder_id")  # From folder URL
 ```
 
-### 3. Custom Embedding Provider
+Supports:
+- Google Docs (→ Markdown)
+- Google Sheets (→ Markdown)
+- Google Slides (→ Markdown)
+- PDFs, Text files, etc.
 
-Create a custom embedding provider by inheriting from `BaseEmbedding`:
-
+#### Azure Blob Storage
 ```python
-from vector_search.embeddings import BaseEmbedding
-import numpy as np
-from typing import List, Union
+from vector_search import VectorSearch
 
-class CustomEmbedding(BaseEmbedding):
-    def __init__(self):
-        # Add custom initialization
-        pass
-
-    def embed(self, texts: Union[str, List[str]]) -> np.ndarray:
-        if isinstance(texts, str):
-            texts = [texts]
-            
-        # Implement embedding generation logic
-        embeddings = []  # Your logic here
-        
-        return np.array(embeddings)
+vs = VectorSearch(source_type="azure_blob")
+vs.process_source("container/path")
 ```
 
-### 4. Custom Database Provider
+### Text Processing
 
-Create a custom database provider by inheriting from `BaseDatabase`:
-
+#### Chunking Strategies
 ```python
-from vector_search.database import BaseDatabase
-import numpy as np
-from typing import Dict, List
+from vector_search import VectorSearch
 
-class CustomDatabase(BaseDatabase):
-    def __init__(self):
-        # Add custom initialization
-        pass
-
-    def initialize(self) -> None:
-        # Initialize database schema
-        pass
-
-    def store_embeddings(self, chunks: List[Dict], embeddings: np.ndarray) -> None:
-        # Store chunks and embeddings
-        pass
-
-    def search(self, query_embedding: np.ndarray, limit: int = 5) -> List[Dict]:
-        # Implement similarity search
-        results = []  # Your logic here
-        
-        return results
-```
-
-### 5. Custom Augmenter
-
-Create a custom augmenter by inheriting from `BaseAugmenter`:
-
-```python
-from vector_search.augmentation import BaseAugmenter
-from typing import Dict, List
-
-class CustomAugmenter(BaseAugmenter):
-    def __init__(self):
-        # Add custom initialization
-        pass
-
-    def augment(self, chunks: List[Dict]) -> List[Dict]:
-        augmented_chunks = []
-        
-        for chunk in chunks:
-            # Keep original chunk
-            augmented_chunks.append(chunk)
-            
-            # Add augmented version
-            augmented_text = self.generate_variation(chunk["text"])
-            augmented_chunk = chunk.copy()
-            augmented_chunk["text"] = augmented_text
-            augmented_chunk["metadata"] = {
-                **chunk["metadata"],
-                "augmented": True,
-                "original_chunk_index": chunk["chunk_index"]
-            }
-            augmented_chunks.append(augmented_chunk)
-            
-        return augmented_chunks
-
-    def generate_variation(self, text: str) -> str:
-        # Implement text variation generation
-        return modified_text
-```
-
-## Using Custom Components
-
-```python
-# Initialize VectorSearch with custom components
-vector_search = VectorSearch(
-    source_type="folder",
+# Word-based chunking
+vs = VectorSearch(
     chunker_type="word",
-    embedding_type="ollama",
-    database_type="postgres"
+    chunk_size=1000,
+    chunk_overlap=200
 )
 
-# Add custom chunker
-def sentence_chunker(text: str) -> list:
-    import re
-    sentences = re.split(r'[.!?]+', text)
-    return [s.strip() for s in sentences if s.strip()]
-
-vector_search.add_custom_chunker(sentence_chunker)
-
-# Add custom embedding function
-def custom_embed(texts):
-    # Your embedding logic here
-    return embeddings
-
-vector_search.add_custom_embedding(custom_embed)
+# Character-based chunking
+vs = VectorSearch(
+    chunker_type="character",
+    chunk_size=4000,
+    chunk_overlap=400
+)
 ```
 
-## Database Schema
+#### Text Augmentation
+```python
+from vector_search import VectorSearch
 
-Both PostgreSQL and Supabase use the same table schema:
+# Using Ollama for augmentation
+vs = VectorSearch(
+    augment=True,
+    augmenter_type="ollama",
+    augmenter_config={
+        "model_name": "llama3.1:8b"
+    }
+)
 
+# Using OpenAI
+vs = VectorSearch(
+    augment=True,
+    augmenter_type="openai",
+    augmenter_config={
+        "model_name": "gpt-3.5-turbo"
+    }
+)
+```
+
+#### Tag Generation
+```python
+from vector_search.tags import OllamaTagGenerator, OpenAITagGenerator
+
+# Free-form tags
+generator = OllamaTagGenerator(max_tags=3)
+tagged_chunks = generator.generate_tags(chunks)
+
+# Predefined tags
+generator = OpenAITagGenerator(
+    max_tags=3,
+    predefined_tags={"ai", "machine learning", "python"}
+)
+tagged_chunks = generator.generate_tags(chunks)
+```
+
+### Embedding Providers
+
+#### Ollama (Local)
+```python
+from vector_search import VectorSearch
+
+vs = VectorSearch(
+    embedding_type="ollama",
+    embedding_config={
+        "model_name": "bge-m3:latest"
+    }
+)
+```
+
+#### OpenAI
+```python
+vs = VectorSearch(
+    embedding_type="openai",
+    embedding_config={
+        "model_name": "text-embedding-3-small"
+    }
+)
+```
+
+#### Azure OpenAI
+```python
+vs = VectorSearch(
+    embedding_type="azure_openai",
+    embedding_config={
+        "deployment": "your-deployment"
+    }
+)
+```
+
+### Database Integration
+
+#### PostgreSQL
+```python
+from vector_search import VectorSearch
+
+vs = VectorSearch(database_type="postgres")
+```
+
+Required schema:
 ```sql
 CREATE TABLE chunks (
     id SERIAL PRIMARY KEY,
@@ -327,15 +352,13 @@ CREATE INDEX ON chunks USING ivfflat (embedding vector_cosine_ops)
 WITH (lists = 100);
 ```
 
-### Supabase Vector Search Function
+#### Supabase
+```python
+vs = VectorSearch(database_type="supabase")
+```
 
-For Supabase, you need to create a stored function for vector similarity search. Add this function in the Supabase SQL editor:
-
+Additional function for Supabase:
 ```sql
--- Enable the pgvector extension
-create extension if not exists vector;
-
--- Create the match_chunks function
 create or replace function match_chunks (
   query_embedding vector(1536),
   match_threshold float,
@@ -366,161 +389,73 @@ end;
 $$;
 ```
 
-This function:
-1. Takes a query embedding vector, similarity threshold, and result limit as parameters
-2. Returns matching chunks with their similarity scores
-3. Uses the cosine distance operator `<=>` for similarity calculation
-4. Orders results by similarity (highest first)
-5. Limits results based on the match_count parameter
+## Advanced Features
 
-### Usage in Code
-
-The function is automatically used by the SupabaseDatabase class:
-
+### Text Filtering
 ```python
-from vector_search.database import SupabaseDatabase
+def custom_filter(text: str) -> str:
+    # Remove specific patterns
+    text = text.replace("[REMOVE]", "")
+    # Convert to lowercase
+    text = text.lower()
+    # Clean whitespace
+    text = " ".join(text.split())
+    return text
 
-db = SupabaseDatabase(
-    url=os.getenv("SUPABASE_URL"),
-    key=os.getenv("SUPABASE_KEY"),
-    table=os.getenv("SUPABASE_TABLE", "chunks")
-)
-
-# Search will use the match_chunks function internally
-results = db.search(query_embedding, limit=5)
-```
-
-### Function Parameters
-
-- `query_embedding`: The vector to search for (dimension must match table)
-- `match_threshold`: Minimum similarity score (0.0 to 1.0)
-- `match_count`: Maximum number of results to return
-
-### Return Values
-
-Each result includes:
-- `id`: The chunk's unique identifier
-- `text`: The chunk's text content
-- `metadata`: Associated metadata as JSONB
-- `date`: Timestamp of when the chunk was added
-- `similarity`: Cosine similarity score (0.0 to 1.0)
-
-## Test Files and Examples
-
-The `tests/` directory contains several test files that demonstrate how to use different components of the system:
-
-### 1. Basic Workflow Test (`test_workflow.py`)
-```python
-# Complete example of processing files and storing in database
-from vector_search.chunker import WordChunker
-from vector_search.embeddings import OllamaEmbedding
-from vector_search.database import PostgresDatabase
-
-# Creates sample text files and processes them
-test_folder = "test_samples"
-file_paths = setup_sample_texts(test_folder)
-process_files(file_paths)
-```
-
-### 2. Database Tests (`test_database.py`)
-```python
-# Test PostgreSQL and Supabase implementations
-from vector_search.database import PostgresDatabase, SupabaseDatabase
-
-# PostgreSQL example
-db = PostgresDatabase(
-    dbname=os.getenv("POSTGRES_DB"),
-    user=os.getenv("POSTGRES_USER"),
-    password=os.getenv("POSTGRES_PASSWORD"),
-    host=os.getenv("POSTGRES_HOST"),
-    port=int(os.getenv("POSTGRES_PORT", "5432")),
-    vector_dim=1536
-)
-
-# Store and search example data
-db.initialize()
-db.store_embeddings(chunks, embeddings)
-results = db.search(query_embedding, limit=2)
-```
-
-### 3. Embedding Tests (`test_embeddings.py`)
-```python
-# Test different embedding providers
-from vector_search.embeddings import OllamaEmbedding, OpenAIEmbedding
-
-# Ollama example
-embedding = OllamaEmbedding(model="bge-m3:latest")
-result = embedding.embed("This is a test document")
-
-# OpenAI example
-embedding = OpenAIEmbedding()
-result = embedding.embed("This is a test document")
-```
-
-### 4. Source Tests (`test_sources.py`)
-```python
-# Test different source providers
-from vector_search.sources import FolderSource, FileSource, GoogleDriveSource
-
-# Folder source example
-source = FolderSource()
-for doc in source.load_documents("path/to/folder"):
-    print(f"Document: {doc['metadata']['source']}")
-    print(f"Content: {doc['text'][:100]}...")
-```
-
-### 5. Chunker Tests (`test_chunkers.py`)
-```python
-# Test different chunking strategies
-from vector_search.chunker import WordChunker, CharacterChunker
-
-# Word chunker example
-chunker = WordChunker(chunk_size=100, chunk_overlap=20)
-chunks = chunker.chunk_text(text, metadata={"source": "test.txt"})
-```
-
-### 6. Vector Search Tests (`test_vector_search.py`)
-```python
-# Test the main VectorSearch implementation
-from vector_search.vector_search import VectorSearch
-
-# Basic workflow
-vector_search = VectorSearch(
+vs = VectorSearch(
     source_type="folder",
-    chunker_type="word",
-    embedding_type="ollama",
-    database_type="postgres"
+    text_filter=custom_filter
 )
-
-# Process and search
-vector_search.process_source("test_data")
-results = vector_search.search("What is machine learning?", limit=5)
 ```
 
-### Running the Tests
+### Custom Components
 
-1. Make sure you have all dependencies installed and environment variables set
-2. Run individual tests:
+#### Custom Source
+```python
+from vector_search.sources import BaseSource
+
+class CustomSource(BaseSource):
+    def load_documents(self, source_path: str):
+        # Your implementation
+        yield {
+            "text": content,
+            "metadata": metadata
+        }
+```
+
+#### Custom Chunker
+```python
+from vector_search.chunker import BaseChunker
+
+class CustomChunker(BaseChunker):
+    def chunk_text(self, text: str, metadata: dict = None):
+        # Your implementation
+        return chunks
+```
+
+#### Custom Embedding
+```python
+from vector_search.embeddings import BaseEmbedding
+
+class CustomEmbedding(BaseEmbedding):
+    def embed(self, texts: Union[str, List[str]]):
+        # Your implementation
+        return embeddings
+```
+
+## Testing
+
+Run specific tests:
 ```bash
 python -m pytest tests/test_database.py
 python -m pytest tests/test_embeddings.py
 python -m pytest tests/test_sources.py
-python -m pytest tests/test_chunkers.py
-python -m pytest tests/test_vector_search.py
-python -m pytest tests/test_workflow.py
 ```
 
-3. Run all tests:
+Run all tests:
 ```bash
 python -m pytest tests/
 ```
-
-The test files serve as both documentation and examples of how to use each component of the system. They demonstrate:
-- Basic usage patterns
-- Component initialization
-- Error handling
-- Integration between components
-- Complete workflows
 
 ## Contributing
 
@@ -808,9 +743,7 @@ chunks = [
     {
         "text": "Machine learning enables systems to learn from experience.",
         "metadata": {
-            "source": "ml_doc",
-            "format": "txt"
-        },
+            "source": "doc.txt"},
         "chunk_index": 0
     }
 ]
@@ -863,3 +796,204 @@ AZURE_OPENAI_ENDPOINT=your_endpoint
 2. Test augmented results to ensure they maintain semantic accuracy
 3. Consider the trade-off between augmentation quantity and processing time
 4. Use environment variables for API keys and configuration
+
+# Tag Generation
+
+The vector-search library includes powerful AI-powered tag generation capabilities. You can either generate free-form tags or select from a predefined list of tags. The feature supports multiple AI providers:
+
+## Tag Generators
+
+### 1. Free-form Tag Generation
+
+Generate tags freely based on the content:
+
+#### Using Ollama (Local)
+```python
+from vector_search.tags import OllamaTagGenerator
+
+generator = OllamaTagGenerator(
+    model_name="llama3.1:8b",  # Model to use
+    max_tags=3,                # Maximum tags per chunk
+    temperature=0.3,           # Model creativity (0.0 to 1.0)
+    base_url=None             # Optional: Defaults to OLLAMA_BASE_URL env var
+)
+
+# Process chunks
+chunks = [
+    {
+        "text": "Machine learning enables systems to learn from experience.",
+        "metadata": {"source": "doc.txt"},
+        "chunk_index": 0
+    }
+]
+
+tagged_chunks = generator.generate_tags(chunks)
+# Result: {"tags": ["machine learning", "artificial intelligence", "automation"]}
+```
+
+#### Using OpenAI
+```python
+from vector_search.tags import OpenAITagGenerator
+
+generator = OpenAITagGenerator(
+    model_name="gpt-3.5-turbo",  # OpenAI model to use
+    max_tags=3,
+    temperature=0.3,
+    api_key=None               # Optional: Defaults to OPENAI_API_KEY env var
+)
+```
+
+#### Using Azure OpenAI
+```python
+from vector_search.tags import AzureOpenAITagGenerator
+
+generator = AzureOpenAITagGenerator(
+    deployment="your-deployment",
+    max_tags=3,
+    temperature=0.3,
+    api_key=None,             # Optional: From AZURE_OPENAI_API_KEY
+    api_version=None,         # Optional: From AZURE_OPENAI_API_VERSION
+    endpoint=None             # Optional: From AZURE_OPENAI_ENDPOINT
+)
+```
+
+### 2. Predefined Tag Selection
+
+Select tags from a predefined list:
+
+#### Using Ollama
+```python
+from vector_search.tags import OllamaPredefinedTagSelector
+
+# Define allowed tags
+predefined_tags = {
+    "machine learning",
+    "artificial intelligence",
+    "programming",
+    "python",
+    "data science",
+    "deep learning"
+}
+
+selector = OllamaPredefinedTagSelector(
+    predefined_tags=predefined_tags,
+    model_name="llama3.1:8b",
+    max_tags=3
+)
+
+# Process chunks
+tagged_chunks = selector.generate_tags(chunks)
+# Result: {"tags": ["machine learning", "artificial intelligence"]}
+```
+
+#### Using OpenAI
+```python
+from vector_search.tags import OpenAIPredefinedTagSelector
+
+selector = OpenAIPredefinedTagSelector(
+    predefined_tags=predefined_tags,
+    model_name="gpt-3.5-turbo",
+    max_tags=3
+)
+```
+
+#### Using Azure OpenAI
+```python
+from vector_search.tags import AzureOpenAIPredefinedTagSelector
+
+selector = AzureOpenAIPredefinedTagSelector(
+    predefined_tags=predefined_tags,
+    deployment="your-deployment",
+    max_tags=3
+)
+```
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Ollama Configuration
+OLLAMA_BASE_URL=http://localhost:11434
+
+# OpenAI Configuration
+OPENAI_API_KEY=your_openai_key
+
+# Azure OpenAI Configuration
+AZURE_OPENAI_API_KEY=your_azure_key
+AZURE_OPENAI_API_VERSION=your_api_version
+AZURE_OPENAI_ENDPOINT=your_endpoint
+```
+
+## Features
+
+1. **Multiple AI Providers**:
+   - Ollama for local processing
+   - OpenAI for cloud processing
+   - Azure OpenAI for enterprise deployments
+
+2. **Two Tag Generation Modes**:
+   - Free-form tag generation
+   - Selection from predefined tags
+
+3. **Customization Options**:
+   - Control number of tags per chunk
+   - Adjust model temperature
+   - Choose specific models/deployments
+
+4. **Error Handling**:
+   - Graceful handling of API errors
+   - Preservation of original chunks on failure
+   - Validation of predefined tags
+
+5. **Metadata Integration**:
+   - Tags added to chunk metadata
+   - Original metadata preserved
+   - Chunk indices maintained
+
+## Output Format
+
+Each processed chunk includes:
+```python
+{
+    "text": "Original text content",
+    "metadata": {
+        "source": "original_source",
+        "format": "txt",
+        "tags": ["tag1", "tag2", "tag3"],  # Generated/selected tags
+        # ... other original metadata ...
+    },
+    "chunk_index": 0
+}
+```
+
+## Best Practices
+
+1. **Model Selection**:
+   - Use Ollama for privacy-sensitive data
+   - Use OpenAI for high-quality results
+   - Use Azure OpenAI for enterprise compliance
+
+2. **Tag Generation**:
+   - Keep max_tags reasonable (2-5 recommended)
+   - Use lower temperature (0.1-0.3) for consistency
+   - Use higher temperature (0.5-0.7) for creativity
+
+3. **Predefined Tags**:
+   - Keep tag list focused and relevant
+   - Use consistent formatting
+   - Consider hierarchical relationships
+
+4. **Error Handling**:
+   - Always check for empty tag lists
+   - Validate predefined tags
+   - Handle API rate limits
+
+## Dependencies
+
+Required packages:
+```bash
+langchain>=0.1.0
+langchain-openai>=0.0.5
+langchain-community>=0.0.15
+```
